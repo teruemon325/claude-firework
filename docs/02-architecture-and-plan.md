@@ -42,6 +42,7 @@ claude-firework/
 │   │
 │   ├── config/
 │   │   ├── plateau.ts        # 3D Tiles URL / terrain asset id / 整備年度 / LOD
+│   │   │                     # ※ terrain asset id は「採用 ID・確認日・確認方法」をコメントで併記
 │   │   ├── site.ts           # 打上地点、既定の観覧地点、既定カメラ、花火の高度レンジ
 │   │   ├── attribution.ts    # 出典表記の文字列（画面とフッターで共用）
 │   │   └── disclaimer.ts     # 免責文の文字列
@@ -94,7 +95,7 @@ claude-firework/
 ├── scripts/
 │   └── fetch-plateau-catalog.ts      # カタログ API を叩き config/plateau.ts の値を生成
 │
-├── .env.example                      # VITE_CESIUM_ION_TOKEN
+├── .env.example                      # VITE_CESIUM_ION_TOKEN（※ VITE_ 変数はブラウザに公開される）
 ├── vite.config.ts
 ├── tsconfig.json
 └── package.json
@@ -108,12 +109,24 @@ claude-firework/
 
 ### Phase 0：データ確認（コードを書かない）
 
-- `05-verification-checklist.md` の全項目を実施。
-- **完了条件**：盛岡市の建築物 3D Tiles の URL・LOD・整備年度が確定し、
-  都南大橋周辺に建物データがあるか否かが判明していること。
+- [`05-verification-checklist.md`](05-verification-checklist.md) の全項目を実施し、記録欄を埋めてコミットする。
+- 主な確認内容：
+  - **整備年度**：2024 年度版を最優先で確認し、無ければ 2023 → 2022 の順に採用年度を決める。
+  - **収録範囲**：建築物・地形・道路・土地利用の **4 地物型を個別に**、都南大橋周辺で実データ確認する
+    （メッシュ単位の地物型についても推定で済ませない）。
+  - **地形アセット**：PLATEAU-Terrain のアセット ID を固定せず、最新公式ドキュメントまたは実アクセスで
+    有効性を確認し、採用 ID・確認日・確認方法を記録する。
+  - **高さ整合**：都南大橋周辺で実測する。Cesium World Terrain との組み合わせは
+    「ずれる可能性がある」前提で実測し、実測値のみを記録する。
+  - **ion トークン**：`VITE_` 環境変数はブラウザに公開されるため、権限（スコープ）最小化とドメイン制限を設定する。
+  - **昼夜ライティング**：時刻変更だけでは見た目が変わらないため、必要な設定項目を最小 HTML で確認する。
+- **完了条件**：`05` 末尾の **GO / NO-GO 判定**で「GO」または「条件付き GO」と判定できること。
 - **ここで結果が悪ければ、Phase 1 以降の仕様を縮小する。**
 
 ### Phase 1：土台（3D 都市モデルの表示）
+
+> **着手条件：`05-verification-checklist.md` の GO / NO-GO 判定で 1〜7 がすべて GO であること。**
+> 条件付き GO の項目（トークン設定・ライセンス確定など）は、その制約を守って進めます。
 
 - Vite + React + TS の雛形、CesiumJS の組み込み（`CESIUM_BASE_URL` 対応）。
 - PLATEAU-Terrain を設定。ion トークンは `.env` から読む。
@@ -153,11 +166,31 @@ claude-firework/
 
 ### Phase 5：昼夜の切替
 
-- `viewer.clock.currentTime` を昼（例：当日 12:00 JST）／夜（例：当日 20:00 JST）で切替。
-- 夜：`globe.enableLighting = true`、`scene.skyAtmosphere` 調整、地表の明度を下げる、
-  3D Tiles のスタイルで建物を暗くする、花火に `PostProcessStageLibrary.createBloomStage` を適用。
+> **⚠️ 時計（`viewer.clock`）の時刻を変えるだけでは、昼夜の見た目はほとんど変わりません。
+> ライティング設定を明示的に有効化・調整する必要があります。**
+> Cesium の地表照明（`globe.enableLighting`）は**既定で無効**であり、これを有効にしない限り
+> 夜間でも地表は一様に明るいまま描画されます。
+
+- 時刻：`viewer.clock.currentTime` を昼（例：当日 12:00 JST）／夜（例：当日 20:00 JST）で切替。
+  **JST → UTC の変換に注意**（`Cesium.JulianDate` は UTC 基準）。
+- **必要なライティング設定（時刻変更と必ずセットで行う）**：
+
+  | 設定 | 役割 |
+  |---|---|
+  | `scene.globe.enableLighting = true` | 太陽位置に応じた地表の陰影。**既定 false** |
+  | `scene.globe.dynamicAtmosphereLighting` ほか大気照明系 | 大気の明るさを時刻に追従させる |
+  | `scene.skyAtmosphere`（表示・明るさ） | 空の色。夜は暗くする |
+  | `scene.light`（`SunLight` / `DirectionalLight`） | 3D Tiles（建物）への光の当たり方 |
+  | `scene.sun` / `scene.moon` | 太陽・月の表示 |
+  | `imageryLayer.brightness` / `gamma` | 夜モードで地表テクスチャの明度を落とす |
+  | `Cesium3DTileStyle` の `color` | 夜モードで建物を暗くする |
+  | `PostProcessStageLibrary.createBloomStage()` | 花火の発光表現。**負荷が高いため ON/OFF を設定可能にする** |
+  | `viewer.shadows` / `tileset.shadows` | 影の描画。負荷とのトレードオフ |
+
+- 昼／夜それぞれの設定値の組み合わせを `cesium/lighting.ts` に集約し、1 関数で切り替える。
 - 昼：ライティングを戻し、オルソ画像（PLATEAU-Ortho）を有効化して形状を把握しやすくする。
-- **完了条件**：切替ボタンで見た目が変わり、夜モードで花火が視認しやすい。
+- **完了条件**：切替ボタンで見た目が実際に変わり、夜モードで花火が視認しやすい。
+  昼・夜それぞれの fps を測り、実用範囲であることを確認する。
 - 注記：夜モードは**演出であり、実際の夜間の見え方（街灯・光害・煙）を再現するものではない**旨を表示。
 
 ### Phase 6：交通規制区域の表示と注意表示の仕上げ
