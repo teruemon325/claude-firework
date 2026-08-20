@@ -114,41 +114,71 @@ const tStat = document.getElementById('terrainStatus');
 let terrainOk = false;
 function setTerrainStatus(html) { tStat.innerHTML = html; }
 
+let layerJson = null;
 async function diagnoseTerrain() {
   // layer.json に直接届くかを確認して、原因を切り分ける
   try {
     const res = await fetch(DATA.terrainLayerJson, { cache: 'no-store' });
     if (!res.ok) return `layer.json の取得に失敗（HTTP ${res.status}）`;
-    const j = await res.json();
-    return `layer.json OK（maxzoom ${j.maxzoom ?? '?'} / ${j.format ?? '?'}）`;
+    layerJson = await res.json();
+    const j = layerJson;
+    return `layer.json OK（maxzoom ${j.maxzoom ?? '?'} / ${j.format ?? '?'} / scheme ${j.scheme ?? '?'}` +
+      ` / version ${j.version ?? '?'} / tiles ${JSON.stringify(j.tiles ?? '?')}` +
+      ` / available ${Array.isArray(j.available) ? j.available.length + '段' : 'なし'}）`;
   } catch (e) {
     return `layer.json を取得できません: ${e.message}（CORS か通信の問題の可能性）`;
   }
 }
 
-(async () => {
-  const diag = await diagnoseTerrain();
-  setTerrainStatus(`地形サーバー: ${esc(diag)}`);
+document.getElementById('btnShowLayerJson').onclick = () => {
+  const el = document.getElementById('layerJsonOut');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  el.textContent = layerJson
+    ? JSON.stringify(layerJson, null, 1).slice(0, 4000)
+    : 'layer.json をまだ取得できていません。';
+};
+
+let lastDiag = '';
+async function loadTerrain(useVertexNormals) {
   try {
     const tp = await Cesium.CesiumTerrainProvider.fromUrl(
-      DATA.terrainLayerJson, { requestVertexNormals: true });
+      DATA.terrainLayerJson, { requestVertexNormals: useVertexNormals });
     let reported = false;
     tp.errorEvent?.addEventListener?.((err) => {
       if (reported) return;
       reported = true;
       const msg = (err && (err.message || err.error?.message)) || String(err);
-      setTerrainStatus(`<b class="warn">地形タイルの取得に失敗</b><br>${esc(msg)}<br>${esc(diag)}`);
+      terrainOk = false;
+      setTerrainStatus(
+        `<b class="warn">地形タイルの取得に失敗</b>（法線 ${useVertexNormals ? 'あり' : 'なし'}）<br>` +
+        `${esc(msg)}<br>${esc(lastDiag)}`);
       showError('地形タイルを取得できませんでした', msg,
-        '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
+        useVertexNormals
+          ? '「法線なしで再試行」を押すと、法線の要求をやめて読み直します。それでも駄目なら「地形なしで表示（暫定）」で地図だけ表示できます。'
+          : '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
     });
     viewer.terrainProvider = tp;
     terrainOk = true;
-    setTerrainStatus(`地形: 読み込み成功<br>${esc(diag)}`);
+    setTerrainStatus(`地形: 読み込み成功（法線 ${useVertexNormals ? 'あり' : 'なし'}）<br>${esc(lastDiag)}`);
+    return true;
   } catch (e) {
-    setTerrainStatus(`<b class="warn">地形を読み込めませんでした</b><br>${esc(e.message)}<br>${esc(diag)}`);
-    showError('地形を読み込めませんでした', e.message,
-      '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
+    terrainOk = false;
+    setTerrainStatus(`<b class="warn">地形を読み込めませんでした</b><br>${esc(e.message)}<br>${esc(lastDiag)}`);
+    showError('地形を読み込めませんでした', e.message);
+    return false;
   }
+}
+document.getElementById('btnRetryPlain').onclick = async () => {
+  errBox.style.display = 'none';
+  setTerrainStatus('法線なしで再試行中…');
+  await loadTerrain(false);
+  await placeFirework();
+};
+
+(async () => {
+  lastDiag = await diagnoseTerrain();
+  setTerrainStatus(`地形サーバー: ${esc(lastDiag)}`);
+  await loadTerrain(true);
   setBaseMap(DEFAULT_BASEMAP);
   await loadBuildings('lod1');
   await setupRegulation();

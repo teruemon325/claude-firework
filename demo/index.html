@@ -38,7 +38,12 @@
 
   <h4>地形の状態</h4>
   <div class="hint" id="terrainStatus">確認中…</div>
-  <div class="row"><button id="btnNoTerrain" type="button">地形なしで表示（暫定）</button></div>
+  <div class="row">
+    <button id="btnRetryPlain" type="button">法線なしで再試行</button>
+    <button id="btnNoTerrain" type="button">地形なしで表示（暫定）</button>
+  </div>
+  <div class="row"><button id="btnShowLayerJson" type="button">layer.json の中身を見る</button></div>
+  <pre id="layerJsonOut" style="display:none;max-height:180px;overflow:auto;font-size:10px;background:#f6f6f6;border:1px solid #ddd;border-radius:6px;padding:6px;white-space:pre-wrap;word-break:break-all"></pre>
 
   <h4>背景地図</h4>
   <label class="fld"><select id="basemap"></select></label>
