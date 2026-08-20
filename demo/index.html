@@ -36,12 +36,24 @@
     <input type="range" id="altitude" min="50" max="300" step="10" value="200" />
   </label>
 
-  <h4>地形の状態</h4>
-  <div class="hint" id="terrainStatus">確認中…</div>
-  <div class="row">
-    <button id="btnRetryPlain" type="button">法線なしで再試行</button>
-    <button id="btnNoTerrain" type="button">地形なしで表示（暫定）</button>
+  <h4>地形</h4>
+  <label class="fld"><select id="terrainSrc"></select></label>
+  <div id="ionBox" style="display:none">
+    <label class="fld">
+      <span>Cesium ion アクセストークン（この端末にのみ保存されます）</span>
+      <input type="password" id="ionToken" placeholder="公式ドキュメント 5.1 のトークンを貼り付け"
+        style="width:100%;font-size:11px;padding:4px;border:1px solid #bbb;border-radius:6px" />
+    </label>
+    <div class="row">
+      <button id="btnIonApply" type="button">適用</button>
+      <button id="btnIonClear" type="button">消去</button>
+    </div>
+    <div class="hint">
+      取得先: <a href="https://docs.plateauview.mlit.go.jp/datasets/terrain/" target="_blank" rel="noopener">公式ドキュメント 5.1</a><br>
+      ブラウザの localStorage に保存されます。リポジトリには含まれません。
+    </div>
   </div>
+  <div class="hint" id="terrainStatus">確認中…</div>
   <div class="row"><button id="btnShowLayerJson" type="button">layer.json の中身を見る</button></div>
   <pre id="layerJsonOut" style="display:none;max-height:180px;overflow:auto;font-size:10px;background:#f6f6f6;border:1px solid #ddd;border-radius:6px;padding:6px;white-space:pre-wrap;word-break:break-all"></pre>
 

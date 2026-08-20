@@ -3,7 +3,7 @@
 
 import { DEMO_NOTICE, SOURCES, DATA, LAUNCH_SITE, FIREWORK, EYE_HEIGHT,
   TIME_SLOTS, DEFAULT_TIME_SLOT, HUBS, WEIGHTS, CANDIDATES,
-  BASEMAPS, DEFAULT_BASEMAP } from './config.js';
+  BASEMAPS, DEFAULT_BASEMAP, TERRAIN_SOURCES, DEFAULT_TERRAIN_SOURCE } from './config.js';
 import { surfaceDistance, bearing, compass16, elevationAngle, fmtDistance } from './geo.js';
 import { rankCandidates } from './scoring.js';
 import { FUTURE_WORK } from './congestion.js';
@@ -17,6 +17,7 @@ const errs = [];
 document.getElementById('errClose').onclick = () => (errBox.style.display = 'none');
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 function showError(title, detail, hint) {
+  if (errs.some((e) => e.title === title && e.detail === detail)) return; // 同じ内容は繰り返さない
   errs.push({ title, detail, hint });
   errBody.innerHTML = errs.map((e) =>
     `<p><b>${esc(e.title)}</b><br>${esc(e.detail || '')}${e.hint ? `<br><small>${e.hint}</small>` : ''}</p>`).join('');
@@ -89,15 +90,6 @@ bmSel.innerHTML = BASEMAPS.map((b) => `<option value="${b.id}">${esc(b.label)}</
 bmSel.value = DEFAULT_BASEMAP;
 bmSel.onchange = () => setBaseMap(bmSel.value);
 
-/* ---------- 地形なしの暫定表示 ---------- */
-document.getElementById('btnNoTerrain').onclick = () => {
-  viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
-  terrainOk = false;
-  setTerrainStatus('<b class="warn">地形なしで表示中（暫定）</b><br>' +
-    '地面は平らに描かれ、建物は本来の高さより浮いて見えます。高低差・目線高さは正しくありません。');
-  errBox.style.display = 'none';
-};
-
 /* ---------- 地盤標高の取得（失敗を握りつぶさない） ---------- */
 async function groundHeight(lon, lat) {
   const carto = Cesium.Cartographic.fromDegrees(lon, lat);
@@ -139,50 +131,101 @@ document.getElementById('btnShowLayerJson').onclick = () => {
 };
 
 let lastDiag = '';
-async function loadTerrain(useVertexNormals) {
+const ION_TOKEN_KEY = 'morioka-demo-ion-token';
+const getIonToken = () => (localStorage.getItem(ION_TOKEN_KEY) || '').trim();
+
+const srcSel = document.getElementById('terrainSrc');
+srcSel.innerHTML = TERRAIN_SOURCES.map((t) => `<option value="${t.id}">${esc(t.label)}</option>`).join('');
+const ionBox = document.getElementById('ionBox');
+const ionInput = document.getElementById('ionToken');
+ionInput.value = getIonToken();
+function syncIonBox() { ionBox.style.display = srcSel.value === 'ion' ? 'block' : 'none'; }
+srcSel.onchange = async () => { syncIonBox(); await applyTerrain(srcSel.value); };
+document.getElementById('btnIonApply').onclick = async () => {
+  localStorage.setItem(ION_TOKEN_KEY, ionInput.value.trim());
+  errBox.style.display = 'none'; errs.length = 0;
+  await applyTerrain('ion');
+};
+document.getElementById('btnIonClear').onclick = () => {
+  localStorage.removeItem(ION_TOKEN_KEY); ionInput.value = '';
+  setTerrainStatus('トークンを消去しました。');
+};
+
+function attachTerrainError(tp, label) {
+  let reported = false;
+  tp.errorEvent?.addEventListener?.((err) => {
+    if (reported) return;
+    reported = true;
+    terrainOk = false;
+    const msg = (err && (err.message || err.error?.message)) || String(err);
+    setTerrainStatus(`<b class="warn">地形タイルの取得に失敗（${esc(label)}）</b><br>${esc(msg)}<br>${esc(lastDiag)}`);
+    showError('地形タイルを取得できませんでした', msg,
+      '左パネルの「地形」の選択を変えてください。ion 経由にはアクセストークンが必要です。');
+  });
+}
+
+async function applyTerrain(id) {
+  const src = TERRAIN_SOURCES.find((t) => t.id === id) || TERRAIN_SOURCES[0];
+  srcSel.value = src.id; syncIonBox();
+  terrainOk = false;
+
+  if (src.kind === 'none') {
+    viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+    setTerrainStatus('<b class="warn">地形なしで表示中（暫定）</b><br>' +
+      '地面は平らに描かれ、建物は本来の高さより浮いて見えます。高低差・目線高さは正しくありません。');
+    await placeFirework(true);
+    return;
+  }
+
+  if (src.kind === 'ion') {
+    const token = getIonToken();
+    if (!token) {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      setTerrainStatus('<b class="warn">Cesium ion のトークンが未設定です。</b><br>' +
+        '上の入力欄にトークンを貼って「適用」を押してください。いまは地形なしで表示しています。');
+      await placeFirework(true);
+      return;
+    }
+    try {
+      Cesium.Ion.defaultAccessToken = token;
+      const tp = await Cesium.CesiumTerrainProvider.fromIonAssetId(src.assetId);
+      attachTerrainError(tp, `Cesium ion（アセット ${src.assetId}）`);
+      viewer.terrainProvider = tp;
+      terrainOk = true;
+      setTerrainStatus(`地形: 読み込み成功（Cesium ion / アセット ${src.assetId}）`);
+      await placeFirework();
+    } catch (e) {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      setTerrainStatus(`<b class="warn">Cesium ion から地形を読み込めませんでした</b><br>${esc(e.message)}<br>` +
+        'トークンが正しいか、アセットにアクセスできるかを確認してください。');
+      showError('Cesium ion から地形を読み込めませんでした', e.message);
+      await placeFirework(true);
+    }
+    return;
+  }
+
+  lastDiag = await diagnoseTerrain();
   try {
-    const tp = await Cesium.CesiumTerrainProvider.fromUrl(
-      DATA.terrainLayerJson, { requestVertexNormals: useVertexNormals });
-    let reported = false;
-    tp.errorEvent?.addEventListener?.((err) => {
-      if (reported) return;
-      reported = true;
-      const msg = (err && (err.message || err.error?.message)) || String(err);
-      terrainOk = false;
-      setTerrainStatus(
-        `<b class="warn">地形タイルの取得に失敗</b>（法線 ${useVertexNormals ? 'あり' : 'なし'}）<br>` +
-        `${esc(msg)}<br>${esc(lastDiag)}`);
-      showError('地形タイルを取得できませんでした', msg,
-        useVertexNormals
-          ? '「法線なしで再試行」を押すと、法線の要求をやめて読み直します。それでも駄目なら「地形なしで表示（暫定）」で地図だけ表示できます。'
-          : '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
-    });
+    const tp = await Cesium.CesiumTerrainProvider.fromUrl(DATA.terrainLayerJson, { requestVertexNormals: true });
+    attachTerrainError(tp, '直接配信');
     viewer.terrainProvider = tp;
     terrainOk = true;
-    setTerrainStatus(`地形: 読み込み成功（法線 ${useVertexNormals ? 'あり' : 'なし'}）<br>${esc(lastDiag)}`);
-    return true;
+    setTerrainStatus(`地形: 読み込み成功（直接配信）<br>${esc(lastDiag)}`);
+    await placeFirework();
   } catch (e) {
-    terrainOk = false;
-    setTerrainStatus(`<b class="warn">地形を読み込めませんでした</b><br>${esc(e.message)}<br>${esc(lastDiag)}`);
+    viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+    setTerrainStatus(`<b class="warn">地形を読み込めませんでした（直接配信）</b><br>${esc(e.message)}<br>${esc(lastDiag)}`);
     showError('地形を読み込めませんでした', e.message);
-    return false;
+    await placeFirework(true);
   }
 }
-document.getElementById('btnRetryPlain').onclick = async () => {
-  errBox.style.display = 'none';
-  setTerrainStatus('法線なしで再試行中…');
-  await loadTerrain(false);
-  await placeFirework();
-};
 
 (async () => {
   lastDiag = await diagnoseTerrain();
-  setTerrainStatus(`地形サーバー: ${esc(lastDiag)}`);
-  await loadTerrain(true);
+  await applyTerrain(DEFAULT_TERRAIN_SOURCE);
   setBaseMap(DEFAULT_BASEMAP);
   await loadBuildings('lod1');
   await setupRegulation();
-  await placeFirework();
   refreshRanking();
   flyOverview();
 })();
@@ -244,13 +287,15 @@ function renderLegend() {
 
 /* ---------- 花火 ---------- */
 let launchGround = null;
-async function placeFirework() {
+async function placeFirework(quiet = false) {
   launchGround = await groundHeight(LAUNCH_SITE.lon, LAUNCH_SITE.lat);
   if (launchGround == null) {
     launchGround = 0;
-    showError('打上地点の地盤標高を取得できませんでした',
-      '地形データを読み込めていない可能性があります。',
-      '花火の高さと高低差の表示が正しくありません。ページを再読み込みしてください。');
+    if (!quiet) {
+      showError('打上地点の地盤標高を取得できませんでした',
+        '地形データを読み込めていない可能性があります。',
+        '左パネルの「地形」の選択を変えてください。');
+    }
   }
   renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value));
 }

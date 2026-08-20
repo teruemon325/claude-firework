@@ -42,6 +42,23 @@ export const DATA = {
   regulationGeoJson: './data/traffic-regulation-2026.geojson',
 };
 
+/* 地形の入手経路
+ *
+ * ⚠️ 2026-08-20 の実測: 直接配信（direct）は layer.json は取得できるが、
+ *    layer.json に `available` が無いため Cesium がレベル0のタイルを要求し、
+ *    そのタイルが存在せず 404 になる（地球面が描画されない）。
+ *    → 当面は Cesium ion 経由（ion）を使う。ion はトークンが必要。
+ */
+export const TERRAIN_SOURCES = [
+  { id: 'ion',    label: 'Cesium ion 経由（推奨）', kind: 'ion', assetId: 3258112,
+    note: '公式ドキュメント「5. PLATEAU-Terrain (Cesium ion)」の方式。アクセストークンが必要です。' },
+  { id: 'direct', label: '直接配信（現在 404）',     kind: 'url',
+    note: 'トークン不要ですが、layer.json に available が無くタイルが 404 になります。' },
+  { id: 'none',   label: '地形なし（暫定）',          kind: 'none',
+    note: '地面は平ら。建物が浮いて見え、高さの数値は正しくありません。' },
+];
+export const DEFAULT_TERRAIN_SOURCE = 'ion';
+
 /* 打上地点（⚠️ 公表されていないため推定値） */
 export const LAUNCH_SITE = {
   name: '打上地点（推定）',
