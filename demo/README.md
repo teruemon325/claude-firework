@@ -4,7 +4,16 @@
 > 座標・評価値・混雑予測は**デモ用の概算値および仮の設定値**であり、公式に確認された値ではありません。
 > 実際の見え方・混雑・安全を保証するものではありません。
 
-## 実行方法
+## 公開URL（GitHub Pages）
+
+<https://teruemon325.github.io/claude-firework/>
+
+`.github/workflows/pages.yml` により、`demo/` 配下を更新して push すると自動で再公開されます。
+初回のみ、リポジトリの **Settings → Pages → Source** を **「GitHub Actions」** に設定する必要があります。
+
+デモ版のため、`index.html` に `noindex, nofollow` を指定して検索エンジンには載らないようにしています。
+
+## 実行方法（ローカル）
 
 ビルド不要です。npm / Vite / React は使わず、CesiumJS を CDN（**バージョン 1.117 固定**）から読み込みます。
 ES モジュールを使うため、**ローカル HTTP サーバー経由**で開いてください。
