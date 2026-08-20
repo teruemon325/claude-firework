@@ -36,6 +36,9 @@
     <input type="range" id="altitude" min="50" max="300" step="10" value="200" />
   </label>
 
+  <h4>背景地図</h4>
+  <label class="fld"><select id="basemap"></select></label>
+
   <h4>レイヤー</h4>
   <label class="chk"><input type="checkbox" id="chkBuildings" checked /> 建築物モデル</label>
   <label class="chk"><input type="checkbox" id="chkRegulation" checked /> 交通規制（赤色）</label>
@@ -44,14 +47,18 @@
     <button id="btnLod2" type="button" aria-pressed="false">LOD2</button>
   </div>
 
-  <h4>表示モード</h4>
+  <h4>時間帯の見た目</h4>
   <div class="row">
-    <button id="btnDay" type="button" aria-pressed="false">昼</button>
-    <button id="btnNight" type="button" aria-pressed="true">夜</button>
+    <button id="btnDay" type="button" aria-pressed="true">昼</button>
+    <button id="btnNight" type="button" aria-pressed="false">夜</button>
   </div>
+
+  <h4>視点</h4>
   <div class="row">
-    <button id="btnOverview" type="button">会場を俯瞰</button>
+    <button id="btnOverview" type="button" aria-pressed="true">会場を俯瞰</button>
+    <button id="btnEye" type="button" aria-pressed="false">観覧者の目線（1.6m）</button>
   </div>
+  <div class="hint" id="camInfo">候補地点を選ぶと、その場所の目線に切り替えられます。</div>
 
   <h4 id="legendTitle">交通規制の凡例</h4>
   <div id="legend"></div>

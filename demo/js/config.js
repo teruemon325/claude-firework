@@ -19,6 +19,19 @@ export const SOURCES = {
   checkedAt: '2026-08-20',
 };
 
+/* 背景地図（地理院タイル）
+ * 出典表示が必要です。画面下部に常時表示しています。 */
+export const BASEMAPS = [
+  { id: 'pale',  label: '淡色地図', url: 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', max: 18,
+    credit: '地理院タイル（淡色地図）' },
+  { id: 'std',   label: '標準地図', url: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', max: 18,
+    credit: '地理院タイル（標準地図）' },
+  { id: 'photo', label: '写真',     url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', max: 18,
+    credit: '地理院タイル（全国最新写真）' },
+  { id: 'none',  label: 'なし',     url: null, credit: '' },
+];
+export const DEFAULT_BASEMAP = 'pale';
+
 /* 3D データ（Phase 0 で確認済みの配信 URL） */
 export const DATA = {
   terrainLayerJson: 'https://tile.plateauview.mlit.go.jp/terrain/layer.json',

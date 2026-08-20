@@ -2,7 +2,8 @@
  * ⚠️ デモ版です。座標・評価値・混雑予測は概算／仮の値です。 */
 
 import { DEMO_NOTICE, SOURCES, DATA, LAUNCH_SITE, FIREWORK, EYE_HEIGHT,
-  TIME_SLOTS, DEFAULT_TIME_SLOT, HUBS, WEIGHTS, CANDIDATES } from './config.js';
+  TIME_SLOTS, DEFAULT_TIME_SLOT, HUBS, WEIGHTS, CANDIDATES,
+  BASEMAPS, DEFAULT_BASEMAP } from './config.js';
 import { surfaceDistance, bearing, compass16, elevationAngle, fmtDistance } from './geo.js';
 import { rankCandidates } from './scoring.js';
 import { FUTURE_WORK } from './congestion.js';
@@ -34,13 +35,20 @@ if (typeof Cesium === 'undefined') {
 document.getElementById('yearBadge').textContent =
   `3D都市モデル ${SOURCES.dataYear}年度 / 大会情報 ${SOURCES.eventYear}年`;
 document.getElementById('topNote').textContent = DEMO_NOTICE;
-const attrHtml =
-  `${esc(SOURCES.plateau)}　／　地形: ${esc(SOURCES.terrain)}　／　交通規制: ${esc(SOURCES.event)}を基に再作図（概略・${SOURCES.eventYear}年）` +
-  `　<a href="${SOURCES.eventUrl}" target="_blank" rel="noopener">公式サイト</a>　／　<b>デモ版・実際の見え方や混雑を保証しません</b>`;
-document.getElementById('attr').innerHTML = attrHtml;
-document.getElementById('modalSources').innerHTML =
-  attrHtml + `<br>確認日: ${SOURCES.checkedAt}　／　打上地点: ${esc(LAUNCH_SITE.basis)}` +
-  `<br>将来機能（今回は未実装）: ${FUTURE_WORK.map(esc).join(' / ')}`;
+let baseLayer = null, baseCredit = '';
+function attrHtml() {
+  return `${esc(SOURCES.plateau)}　／　地形: ${esc(SOURCES.terrain)}` +
+    (baseCredit ? `　／　背景地図: 出典 ${esc(baseCredit)}` : '') +
+    `　／　交通規制: ${esc(SOURCES.event)}を基に再作図（概略・${SOURCES.eventYear}年）` +
+    `　<a href="${SOURCES.eventUrl}" target="_blank" rel="noopener">公式サイト</a>　／　<b>デモ版・実際の見え方や混雑を保証しません</b>`;
+}
+function renderAttribution() {
+  document.getElementById('attr').innerHTML = attrHtml();
+  document.getElementById('modalSources').innerHTML =
+    attrHtml() + `<br>確認日: ${SOURCES.checkedAt}　／　打上地点: ${esc(LAUNCH_SITE.basis)}` +
+    `<br>将来機能（今回は未実装）: ${FUTURE_WORK.map(esc).join(' / ')}`;
+}
+renderAttribution();
 document.getElementById('agree').onclick = () => (document.getElementById('modal').style.display = 'none');
 document.getElementById('openInfo').onclick = () => (document.getElementById('modal').style.display = 'flex');
 
@@ -53,6 +61,46 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#cfcfc8');
 viewer.scene.globe.depthTestAgainstTerrain = true;
 
+/* ---------- 背景地図（地理院タイル） ---------- */
+function setBaseMap(id) {
+  const bm = BASEMAPS.find((b) => b.id === id) || BASEMAPS[0];
+  if (baseLayer) { viewer.imageryLayers.remove(baseLayer, true); baseLayer = null; }
+  baseCredit = bm.credit;
+  if (bm.url) {
+    try {
+      const provider = new Cesium.UrlTemplateImageryProvider({ url: bm.url, maximumLevel: bm.max });
+      let reported = false;
+      provider.errorEvent?.addEventListener?.((err) => {
+        if (reported) return;
+        reported = true;
+        showError('背景地図のタイルを取得できませんでした', (err && err.message) || String(err),
+          '「背景地図」を「なし」にすると、地形の陰影だけで表示できます。');
+      });
+      baseLayer = viewer.imageryLayers.addImageryProvider(provider);
+    } catch (e) {
+      showError('背景地図を読み込めませんでした', e.message);
+    }
+  }
+  applyLighting();
+  renderAttribution();
+}
+const bmSel = document.getElementById('basemap');
+bmSel.innerHTML = BASEMAPS.map((b) => `<option value="${b.id}">${esc(b.label)}</option>`).join('');
+bmSel.value = DEFAULT_BASEMAP;
+bmSel.onchange = () => setBaseMap(bmSel.value);
+
+/* ---------- 地盤標高の取得（失敗を握りつぶさない） ---------- */
+async function groundHeight(lon, lat) {
+  const carto = Cesium.Cartographic.fromDegrees(lon, lat);
+  try {
+    const [c] = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [carto]);
+    if (c && isFinite(c.height) && Math.abs(c.height) > 0.01) return c.height;
+  } catch (e) { /* 下のフォールバックへ */ }
+  const h = viewer.scene.globe.getHeight(carto);
+  if (typeof h === 'number' && isFinite(h) && Math.abs(h) > 0.01) return h;
+  return null; // 取得できなかった
+}
+
 (async () => {
   try {
     viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
@@ -61,6 +109,7 @@ viewer.scene.globe.depthTestAgainstTerrain = true;
     showError('地形を読み込めませんでした', e.message,
       '地形なしで続行します。高低差・目線高さは正しく表示されません。');
   }
+  setBaseMap(DEFAULT_BASEMAP);
   await loadBuildings('lod1');
   await setupRegulation();
   await placeFirework();
@@ -124,13 +173,15 @@ function renderLegend() {
 }
 
 /* ---------- 花火 ---------- */
-let launchGround = 0;
+let launchGround = null;
 async function placeFirework() {
-  try {
-    const [c] = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider,
-      [Cesium.Cartographic.fromDegrees(LAUNCH_SITE.lon, LAUNCH_SITE.lat)]);
-    if (c && isFinite(c.height)) launchGround = c.height;
-  } catch { /* 地形なしでも続行 */ }
+  launchGround = await groundHeight(LAUNCH_SITE.lon, LAUNCH_SITE.lat);
+  if (launchGround == null) {
+    launchGround = 0;
+    showError('打上地点の地盤標高を取得できませんでした',
+      '地形データを読み込めていない可能性があります。',
+      '花火の高さと高低差の表示が正しくありません。ページを再読み込みしてください。');
+  }
   renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value));
 }
 const altInput = document.getElementById('altitude');
@@ -138,21 +189,31 @@ altInput.min = FIREWORK.minAlt; altInput.max = FIREWORK.maxAlt; altInput.value =
 document.getElementById('altLabel').textContent = FIREWORK.defaultAlt;
 altInput.oninput = () => {
   document.getElementById('altLabel').textContent = altInput.value;
-  renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value));
+  renderFirework(viewer, LAUNCH_SITE, launchGround ?? 0, Number(altInput.value));
   syncDetail();
 };
 
 /* ---------- 昼夜 ---------- */
+let night = false;
 function setNight(isNight) {
+  night = isNight;
   document.getElementById('btnNight').setAttribute('aria-pressed', String(isNight));
   document.getElementById('btnDay').setAttribute('aria-pressed', String(!isNight));
   viewer.clock.currentTime = Cesium.JulianDate.fromIso8601(
     isNight ? '2026-08-11T11:00:00Z' : '2026-08-11T03:00:00Z'); // JST 20:00 / 12:00
   viewer.clock.shouldAnimate = false;
-  viewer.scene.globe.enableLighting = true;
-  viewer.scene.skyAtmosphere.show = true;
-  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(isNight ? '#20242c' : '#cfcfc8');
+  applyLighting();
   applyNightStyle(isNight);
+}
+function applyLighting() {
+  // 昼は陰影を切って地図を読みやすくし、夜だけ陰影と暗さを付ける
+  viewer.scene.globe.enableLighting = night;
+  viewer.scene.skyAtmosphere.show = true;
+  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(night ? '#20242c' : '#cfcfc8');
+  if (baseLayer) {
+    baseLayer.brightness = night ? 0.45 : 1.0;
+    baseLayer.saturation = night ? 0.5 : 1.0;
+  }
 }
 function applyNightStyle(isNight = document.getElementById('btnNight').getAttribute('aria-pressed') === 'true') {
   if (!tileset) return;
@@ -160,40 +221,62 @@ function applyNightStyle(isNight = document.getElementById('btnNight').getAttrib
     color: isNight ? "color('#3a4050')" : "color('#ffffff')",
   });
 }
-document.getElementById('btnNight').onclick = () => setNight(true);
+document.getElementById('btnNight').onclick = () => setNight(false);
 document.getElementById('btnDay').onclick = () => setNight(false);
-setNight(true);
+setNight(false);
 
 /* ---------- カメラ ---------- */
+let camMode = 'overview';
+function setCamButtons() {
+  document.getElementById('btnOverview').setAttribute('aria-pressed', String(camMode === 'overview'));
+  document.getElementById('btnEye').setAttribute('aria-pressed', String(camMode === 'eye'));
+}
+function camInfo(html) { document.getElementById('camInfo').innerHTML = html; }
+
 function flyOverview() {
+  camMode = 'overview'; setCamButtons();
+  const base = (launchGround ?? 0);
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(LAUNCH_SITE.lon, LAUNCH_SITE.lat - 0.020, 2600),
-    orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
+    destination: Cesium.Cartesian3.fromDegrees(LAUNCH_SITE.lon, LAUNCH_SITE.lat - 0.020, base + 2200),
+    orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-35), roll: 0 },
     duration: 1.4,
   });
+  camInfo('会場を俯瞰しています。候補地点を選んで「観覧者の目線」を押すと、地上からの見え方に切り替わります。');
 }
 document.getElementById('btnOverview').onclick = flyOverview;
+document.getElementById('btnEye').onclick = () => {
+  const r = currentResult();
+  if (!r) { camInfo('<b class="warn">先に右側の候補地点を選んでください。</b>'); return; }
+  flyToViewpoint(r.candidate);
+};
 
 async function flyToViewpoint(cand) {
-  let ground = 0;
-  try {
-    const [c] = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider,
-      [Cesium.Cartographic.fromDegrees(cand.lon, cand.lat)]);
-    if (c && isFinite(c.height)) ground = c.height;
-  } catch { /* noop */ }
+  const ground = await groundHeight(cand.lon, cand.lat);
+  if (ground == null) {
+    camInfo('<b class="warn">この地点の地盤標高を取得できませんでした。</b>目線表示は行いません（地下に潜るため）。');
+    showError('地盤標高を取得できませんでした',
+      `${cand.name} の地盤標高が取得できないため、目線の高さを決められません。`,
+      '地形データの読み込みを待ってからもう一度お試しください。');
+    return null;
+  }
+  camMode = 'eye'; setCamButtons();
   const eye = ground + EYE_HEIGHT;
   const d = surfaceDistance(cand.lon, cand.lat, LAUNCH_SITE.lon, LAUNCH_SITE.lat);
-  const fireworkAbs = launchGround + Number(altInput.value);
+  const fireworkAbs = (launchGround ?? 0) + Number(altInput.value);
   const pitch = elevationAngle(d, fireworkAbs - eye);
+  const head = bearing(cand.lon, cand.lat, LAUNCH_SITE.lon, LAUNCH_SITE.lat);
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(cand.lon, cand.lat, eye),
     orientation: {
-      heading: Cesium.Math.toRadians(bearing(cand.lon, cand.lat, LAUNCH_SITE.lon, LAUNCH_SITE.lat)),
-      pitch: Cesium.Math.toRadians(Math.max(-10, Math.min(45, pitch))),
+      heading: Cesium.Math.toRadians(head),
+      pitch: Cesium.Math.toRadians(Math.max(-5, Math.min(60, pitch))),
       roll: 0,
     },
     duration: 1.6,
   });
+  camInfo(`<b>観覧者の目線</b>（地盤 ${ground.toFixed(0)} m ＋ 1.6 m）で、` +
+    `${compass16(head)}（${head.toFixed(0)}°）の方向を見ています。<br>` +
+    `見上げる角度 約 ${pitch.toFixed(1)}°。マウスのドラッグで自由に見回せます。`);
   return { ground, eye, pitch };
 }
 
@@ -234,13 +317,14 @@ function refreshRanking() {
       refreshRanking();
       const r = currentResult();
       if (r) { showDetail(r); flyToViewpoint(r.candidate); }
+      setCamButtons();
     };
   });
 }
 
 function showDetail(r) {
   const c = r.candidate;
-  const fireworkAbs = launchGround + Number(altInput.value);
+  const fireworkAbs = (launchGround ?? 0) + Number(altInput.value);
   const el = document.getElementById('detail');
   el.style.display = 'block';
   el.innerHTML = `
@@ -262,7 +346,7 @@ function showDetail(r) {
     <ul class="tight">
       <li>打上地点まで（水平距離）: <b>${fmtDistance(r.distance)}</b></li>
       <li>方角: <b>${r.compass}</b>（真北基準 ${r.bearing.toFixed(0)}°）</li>
-      <li>花火の高さ（標高）: 約 ${fireworkAbs.toFixed(0)} m（打上地点の地盤 ${launchGround.toFixed(0)} m ＋ 地上高 ${altInput.value} m）</li>
+      <li>花火の高さ（標高）: 約 ${fireworkAbs.toFixed(0)} m（打上地点の地盤 ${(launchGround ?? 0).toFixed(0)} m ＋ 地上高 ${altInput.value} m）</li>
       <li>見上げる角度の目安: 約 ${elevationAngle(r.distance, fireworkAbs - EYE_HEIGHT).toFixed(1)}°</li>
     </ul>
 
@@ -286,3 +370,6 @@ function showDetail(r) {
     selectedId = null; el.style.display = 'none'; refreshRanking();
   };
 }
+
+/* 初期状態のボタン表示（すべての宣言が済んだあとで実行する） */
+setCamButtons();
