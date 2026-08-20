@@ -297,14 +297,15 @@ async function placeFirework(quiet = false) {
         '左パネルの「地形」の選択を変えてください。');
     }
   }
-  renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value));
+  renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value), night);
+  syncDetail();
 }
 const altInput = document.getElementById('altitude');
 altInput.min = FIREWORK.minAlt; altInput.max = FIREWORK.maxAlt; altInput.value = FIREWORK.defaultAlt;
 document.getElementById('altLabel').textContent = FIREWORK.defaultAlt;
 altInput.oninput = () => {
   document.getElementById('altLabel').textContent = altInput.value;
-  renderFirework(viewer, LAUNCH_SITE, launchGround ?? 0, Number(altInput.value));
+  renderFirework(viewer, LAUNCH_SITE, launchGround ?? 0, Number(altInput.value), night);
   syncDetail();
 };
 
@@ -321,22 +322,34 @@ function setNight(isNight) {
   applyNightStyle(isNight);
 }
 function applyLighting() {
-  // 昼は陰影を切って地図を読みやすくし、夜だけ陰影と暗さを付ける
-  viewer.scene.globe.enableLighting = night;
-  viewer.scene.skyAtmosphere.show = true;
-  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(night ? '#20242c' : '#cfcfc8');
+  // 昼は陰影を切って地図を読みやすくし、夜は暗く落として花火を見やすくする
+  const sc = viewer.scene;
+  sc.globe.enableLighting = night;
+  sc.skyAtmosphere.show = true;
+  if ('brightnessShift' in sc.skyAtmosphere) sc.skyAtmosphere.brightnessShift = night ? -0.75 : 0;
+  if ('saturationShift' in sc.skyAtmosphere) sc.skyAtmosphere.saturationShift = night ? -0.4 : 0;
+  if (sc.sun) sc.sun.show = !night;
+  if (sc.moon) sc.moon.show = night;
+  sc.backgroundColor = Cesium.Color.fromCssColorString(night ? '#03060f' : '#8fbcd9');
+  sc.globe.baseColor = Cesium.Color.fromCssColorString(night ? '#0f1218' : '#cfcfc8');
   if (baseLayer) {
-    baseLayer.brightness = night ? 0.45 : 1.0;
-    baseLayer.saturation = night ? 0.5 : 1.0;
+    baseLayer.brightness = night ? 0.22 : 1.0;
+    baseLayer.saturation = night ? 0.35 : 1.0;
+    baseLayer.contrast = night ? 1.15 : 1.0;
   }
 }
-function applyNightStyle(isNight = document.getElementById('btnNight').getAttribute('aria-pressed') === 'true') {
-  if (!tileset) return;
-  tileset.style = new Cesium.Cesium3DTileStyle({
-    color: isNight ? "color('#3a4050')" : "color('#ffffff')",
-  });
+function applyNightStyle(isNight = night) {
+  if (tileset) {
+    tileset.style = new Cesium.Cesium3DTileStyle({
+      color: isNight ? "color('#2a3040')" : "color('#ffffff')",
+    });
+  }
+  // 花火の見た目も昼夜で切り替える
+  if (launchGround != null) {
+    renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value), isNight);
+  }
 }
-document.getElementById('btnNight').onclick = () => setNight(false);
+document.getElementById('btnNight').onclick = () => setNight(true);
 document.getElementById('btnDay').onclick = () => setNight(false);
 setNight(false);
 

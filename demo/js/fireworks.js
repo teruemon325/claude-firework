@@ -3,10 +3,14 @@
 
 let entities = [];
 
-export function renderFirework(viewer, site, groundHeight, altitudeAGL) {
+export function renderFirework(viewer, site, groundHeight, altitudeAGL, night = false) {
   clearFirework(viewer);
   const base = groundHeight ?? 0;
   const top = base + altitudeAGL;
+  // 夜は明るく光っているように、昼は控えめに描く
+  const fill = night ? '#fff3b0' : '#ffd166';
+  const line = night ? '#ffcc33' : '#ff8800';
+  const fillAlpha = night ? 0.75 : 0.45;
 
   // 高度を示す縦線
   entities.push(viewer.entities.add({
@@ -16,7 +20,7 @@ export function renderFirework(viewer, site, groundHeight, altitudeAGL) {
       ]),
       width: 2,
       material: new Cesium.PolylineDashMaterialProperty({
-        color: Cesium.Color.ORANGE.withAlpha(0.8),
+        color: Cesium.Color.fromCssColorString(line).withAlpha(night ? 0.95 : 0.8),
       }),
     },
   }));
@@ -26,9 +30,9 @@ export function renderFirework(viewer, site, groundHeight, altitudeAGL) {
     position: Cesium.Cartesian3.fromDegrees(site.lon, site.lat, top),
     ellipsoid: {
       radii: new Cesium.Cartesian3(60, 60, 60),
-      material: Cesium.Color.fromCssColorString('#ffd166').withAlpha(0.45),
+      material: Cesium.Color.fromCssColorString(fill).withAlpha(fillAlpha),
       outline: true,
-      outlineColor: Cesium.Color.fromCssColorString('#ff8800').withAlpha(0.9),
+      outlineColor: Cesium.Color.fromCssColorString(line).withAlpha(0.95),
     },
     label: {
       text: `花火（イメージ）\n地上高 ${altitudeAGL} m`,
