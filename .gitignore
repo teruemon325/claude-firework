@@ -1,0 +1,18 @@
+# Phase 0 検証用のローカル設定（トークン等が入り得るためコミットしない）
+verify/config.local.js
+
+# 環境変数
+.env
+.env.*
+!.env.example
+
+# 依存関係・ビルド成果物（Phase 1 以降）
+node_modules/
+dist/
+.vite/
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

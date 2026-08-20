@@ -14,7 +14,8 @@
 | [docs/02-architecture-and-plan.md](docs/02-architecture-and-plan.md) | フォルダ構成・技術選定・段階的な実装順序（Phase 0〜7） |
 | [docs/03-data-and-license.md](docs/03-data-and-license.md) | 必要データ一覧・出典表記の文案・画面表示する免責文の文案 |
 | [docs/04-risks.md](docs/04-risks.md) | 技術上の問題点とリスク、その回避方針 |
-| [docs/05-verification-checklist.md](docs/05-verification-checklist.md) | 実装着手前に**自分の手で**確認すべき項目とコマンド |
+| [docs/05-verification-checklist.md](docs/05-verification-checklist.md) | 実装着手前に**自分の手で**確認すべき項目とコマンド（実測結果を随時記録） |
+| [verify/README.md](verify/README.md) | Phase 0 の検証用ページ（高さ整合の目視確認）の実行方法 |
 
 ## 結論（要約）
 

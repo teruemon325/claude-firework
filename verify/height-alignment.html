@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Phase 0 検証 — 高さ整合の確認（盛岡市）</title>
+
+<!--
+  Phase 0 専用の検証ページ。アプリのコードではありません。
+
+  目的:
+    PLATEAU-Terrain（直接配信）と PLATEAU 建築物 3D Tiles を、
+    補正を一切かけずにそのまま重ね、建物の足元が地面に接しているかを目視で確認する。
+
+  やらないこと:
+    花火の表示 / 観覧地点の選択 / 距離・方位の計算 / 交通規制の表示 /
+    建物の高さ補正・位置補正（modelMatrix によるオフセット等）
+
+  CesiumJS のバージョンはここで固定している。
+  変更する場合は下の 3 か所（css / js / data-cesium-version）をすべて合わせ、
+  verify/config.local.js の meta.cesiumVersion も更新すること。
+-->
+<link
+  href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css"
+  rel="stylesheet"
+/>
+<script
+  src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"
+  data-cesium-version="1.117"
+></script>
+
+<!--
+  設定ファイル。config.example.js をコピーして config.local.js を作ること。
+  config.local.js は .gitignore 済みでコミットされない。
+-->
+<script src="./config.local.js" onerror="window.__CONFIG_LOAD_FAILED = true"></script>
+
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  #cesiumContainer { position: absolute; inset: 0; }
+
+  .panel {
+    position: absolute; z-index: 10;
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(0,0,0,.18);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+    font-size: 12px; line-height: 1.6; color: #111;
+  }
+  #controls { top: 10px; left: 10px; padding: 10px 12px; max-width: 300px; }
+  #info     { top: 10px; right: 10px; padding: 10px 12px; width: 340px; max-height: 70vh; overflow: auto; }
+  #readout  { bottom: 46px; left: 10px; padding: 8px 12px; font-variant-numeric: tabular-nums; }
+
+  #attribution {
+    position: absolute; z-index: 10; left: 0; right: 0; bottom: 0;
+    padding: 6px 12px; background: rgba(0,0,0,.72); color: #fff;
+    font-size: 11px; line-height: 1.5;
+  }
+  #attribution b { font-weight: 600; }
+
+  #errors {
+    position: absolute; z-index: 30; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: min(680px, 90vw); max-height: 70vh; overflow: auto;
+    padding: 16px 18px; border-radius: 10px;
+    background: #7f1d1d; color: #fff; font-size: 13px; line-height: 1.7;
+    box-shadow: 0 6px 30px rgba(0,0,0,.4);
+    display: none;
+  }
+  #errors h2 { margin: 0 0 8px; font-size: 15px; }
+  #errors ul { margin: 8px 0 0; padding-left: 20px; }
+  #errors code { background: rgba(255,255,255,.15); padding: 1px 4px; border-radius: 3px; }
+  #errors .close { float: right; cursor: pointer; opacity: .8; }
+
+  h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: .04em; color: #444; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  button {
+    font: inherit; font-size: 11px; padding: 4px 8px; cursor: pointer;
+    border: 1px solid #bbb; border-radius: 5px; background: #fff;
+  }
+  button:hover { background: #f0f0f0; }
+  button[aria-pressed="true"] { background: #0f766e; border-color: #0f766e; color: #fff; }
+  table.kv { width: 100%; border-collapse: collapse; }
+  table.kv th, table.kv td { text-align: left; vertical-align: top; padding: 2px 0; }
+  table.kv th { width: 108px; font-weight: 600; color: #444; padding-right: 8px; }
+  table.kv td { word-break: break-all; }
+  .hint { color: #555; font-size: 11px; margin-top: 6px; }
+  .warn { color: #92400e; }
+  #copyResult { margin-left: 6px; color: #0f766e; }
+</style>
+</head>
+<body>
+
+<div id="cesiumContainer"></div>
+
+<div id="controls" class="panel">
+  <h3>カメラ位置</h3>
+  <div class="row" id="cameraButtons"></div>
+  <h3>建築物モデル</h3>
+  <div class="row" id="buildingButtons"></div>
+  <div class="hint">
+    右ドラッグ／Ctrl+ドラッグ で視点を傾けられます。<br />
+    <span class="warn">高さ補正は一切かけていません。</span>取得データをそのまま重ねています。
+  </div>
+</div>
+
+<div id="info" class="panel">
+  <h3>記録用の情報</h3>
+  <table class="kv" id="infoTable"></table>
+  <div class="row" style="margin-top:10px">
+    <button id="copyRecord" type="button">記録用テキストをコピー</button>
+    <span id="copyResult"></span>
+  </div>
+  <div class="hint">
+    コピーした内容を <code>docs/05-verification-checklist.md</code> の D 節に貼り付けてください。
+  </div>
+</div>
+
+<div id="readout" class="panel">
+  <span id="camReadout">カメラ位置: —</span>
+  <button id="copyCam" type="button" style="margin-left:8px">この位置をコピー</button>
+</div>
+
+<div id="attribution">
+  <span id="attrTerrain"></span>
+  <span id="attrBuildings"></span>
+  <span id="attrExtra"></span>
+</div>
+
+<div id="errors">
+  <span class="close" id="errClose">✕</span>
+  <h2>読み込みエラー</h2>
+  <div id="errBody"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= エラー表示 ================= */
+  const errBox  = document.getElementById('errors');
+  const errBody = document.getElementById('errBody');
+  const errList = [];
+  document.getElementById('errClose').onclick = () => { errBox.style.display = 'none'; };
+
+  function showError(title, detail, hint) {
+    errList.push({ title, detail, hint });
+    errBody.innerHTML = errList.map(function (e) {
+      return '<p><b>' + esc(e.title) + '</b><br>' + esc(e.detail) +
+        (e.hint ? '<ul><li>' + e.hint + '</li></ul>' : '') + '</p>';
+    }).join('');
+    errBox.style.display = 'block';
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+  window.addEventListener('error', function (ev) {
+    if (ev && ev.message) showError('スクリプトエラー', ev.message);
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    showError('未処理のエラー', (ev.reason && ev.reason.message) || String(ev.reason));
+  });
+
+  /* ================= 前提チェック ================= */
+  if (typeof Cesium === 'undefined') {
+    showError('CesiumJS を読み込めませんでした',
+      'CDN から Cesium.js を取得できていません。',
+      'ネットワーク接続と、<code>https://cesium.com</code> へのアクセス可否を確認してください。');
+    return;
+  }
+  if (window.__CONFIG_LOAD_FAILED || !window.VERIFY_CONFIG) {
+    showError('設定ファイル config.local.js がありません',
+      'verify/config.local.js を読み込めませんでした。',
+      '<code>cp verify/config.example.js verify/config.local.js</code> を実行してから、' +
+      'ブラウザを再読み込みしてください。config.local.js は .gitignore 済みです。');
+    return;
+  }
+
+  const cfg = window.VERIFY_CONFIG;
+  const meta = cfg.meta || {};
+  const disp = cfg.display || {};
+
+  // CesiumJS のバージョンが HTML と設定でずれていないか確認する
+  const htmlCesiumVersion =
+    (document.querySelector('script[data-cesium-version]') || {}).dataset?.cesiumVersion || '(不明)';
+  if (meta.cesiumVersion && meta.cesiumVersion !== htmlCesiumVersion) {
+    showError('CesiumJS のバージョン設定が一致していません',
+      'HTML: ' + htmlCesiumVersion + ' / config.local.js: ' + meta.cesiumVersion,
+      'どちらかに合わせてください。記録の正確さに関わります。');
+  }
+
+  // ion は使わない構成。設定されている場合のみ適用する
+  if (cfg.cesiumIonToken) {
+    Cesium.Ion.defaultAccessToken = cfg.cesiumIonToken;
+  }
+
+  /* ================= Viewer ================= */
+  let viewer;
+  try {
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      baseLayer: false,
+      baseLayerPicker: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      navigationHelpButton: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+    });
+  } catch (e) {
+    showError('Viewer を初期化できませんでした', e.message);
+    return;
+  }
+
+  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(disp.globeBaseColor || '#d8d8d0');
+  viewer.scene.globe.enableLighting = disp.enableLighting !== false;
+  if (disp.fixedTimeIso) {
+    try {
+      viewer.clock.currentTime = Cesium.JulianDate.fromIso8601(disp.fixedTimeIso);
+      viewer.clock.shouldAnimate = false;
+    } catch (e) {
+      showError('fixedTimeIso の指定が不正です', e.message);
+    }
+  }
+
+  // 背景画像タイル（任意）
+  if (disp.imageryUrlTemplate) {
+    try {
+      viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+        url: disp.imageryUrlTemplate,
+        maximumLevel: disp.imageryMaximumLevel || 19,
+      }));
+    } catch (e) {
+      showError('背景画像タイルを読み込めませんでした', e.message,
+        'config.local.js の display.imageryUrlTemplate を確認するか、null にしてください。');
+    }
+  }
+
+  /* ================= 地形 ================= */
+  const terrainCfg = cfg.terrain || {};
+  let terrainLoaded = false;
+
+  (async function loadTerrain() {
+    if (!terrainCfg.layerJsonUrl) {
+      showError('地形の URL が設定されていません', 'config.local.js の terrain.layerJsonUrl が空です。');
+      return;
+    }
+    try {
+      const provider = await Cesium.CesiumTerrainProvider.fromUrl(terrainCfg.layerJsonUrl, {
+        requestVertexNormals: terrainCfg.requestVertexNormals !== false,
+      });
+      viewer.terrainProvider = provider;
+      terrainLoaded = true;
+      setInfo('terrainStatus', '✅ 読み込み成功');
+      provider.errorEvent.addEventListener(function (err) {
+        showError('地形タイルの取得に失敗しました', err.message || String(err),
+          '一時的な障害か、その範囲のタイルが存在しない可能性があります。');
+      });
+    } catch (e) {
+      setInfo('terrainStatus', '❌ 失敗');
+      showError('地形を読み込めませんでした',
+        (e && e.message) || String(e),
+        'URL: <code>' + esc(terrainCfg.layerJsonUrl) + '</code><br>' +
+        'ブラウザで直接この URL を開けるか確認してください。' +
+        'PLATEAU 配信サービスは試験運用のため、停止・変更の可能性があります。');
+    }
+  })();
+
+  /* ================= 建築物 3D Tiles ================= */
+  const buildings = Array.isArray(cfg.buildings) ? cfg.buildings : [];
+  let currentTileset = null;
+  let currentBuildingIndex = -1;
+
+  async function loadBuildings(index) {
+    const entry = buildings[index];
+    if (!entry) {
+      showError('建築物モデルの設定がありません', 'config.local.js の buildings を確認してください。');
+      return;
+    }
+    if (currentTileset) {
+      viewer.scene.primitives.remove(currentTileset);
+      currentTileset = null;
+    }
+    currentBuildingIndex = index;
+    updateBuildingButtons();
+    setInfo('tilesetLabel', entry.label);
+    setInfo('tilesetUrl', entry.url);
+    setInfo('tilesetStatus', '読み込み中…');
+
+    try {
+      // 高さ補正・位置補正は一切かけない。取得データをそのまま追加する。
+      const tileset = await Cesium.Cesium3DTileset.fromUrl(entry.url);
+      viewer.scene.primitives.add(tileset);
+      currentTileset = tileset;
+      setInfo('tilesetStatus', '✅ 読み込み成功');
+      tileset.tileFailed.addEventListener(function (err) {
+        showError('建築物タイルの取得に失敗しました',
+          (err && (err.message || err.url)) || String(err));
+      });
+    } catch (e) {
+      setInfo('tilesetStatus', '❌ 失敗');
+      showError('建築物モデルを読み込めませんでした',
+        (e && e.message) || String(e),
+        'URL: <code>' + esc(entry.url) + '</code><br>' +
+        'ブラウザで直接この URL を開き、tileset.json が返るか確認してください。');
+    }
+  }
+
+  /* ================= カメラ ================= */
+  const cameras = Array.isArray(cfg.cameras) ? cfg.cameras : [];
+
+  function flyTo(index, instant) {
+    const c = cameras[index];
+    if (!c) return;
+    const view = {
+      destination: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, c.height),
+      orientation: {
+        heading: Cesium.Math.toRadians(c.heading || 0),
+        pitch: Cesium.Math.toRadians(typeof c.pitch === 'number' ? c.pitch : -45),
+        roll: 0,
+      },
+    };
+    if (instant) viewer.camera.setView(view);
+    else viewer.camera.flyTo(Object.assign({ duration: 1.2 }, view));
+  }
+
+  /* ================= UI 構築 ================= */
+  const cameraButtons = document.getElementById('cameraButtons');
+  cameras.forEach(function (c, i) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = c.label || ('カメラ' + (i + 1));
+    b.title = c.note || '';
+    b.onclick = function () { flyTo(i, false); };
+    cameraButtons.appendChild(b);
+  });
+  if (!cameras.length) {
+    cameraButtons.textContent = '（cameras が未設定です）';
+  }
+
+  const buildingButtons = document.getElementById('buildingButtons');
+  function updateBuildingButtons() {
+    Array.prototype.forEach.call(buildingButtons.children, function (b, i) {
+      b.setAttribute('aria-pressed', String(i === currentBuildingIndex));
+    });
+  }
+  buildings.forEach(function (entry, i) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = entry.label || ('モデル' + (i + 1));
+    b.onclick = function () { loadBuildings(i); };
+    buildingButtons.appendChild(b);
+  });
+  if (!buildings.length) {
+    buildingButtons.textContent = '（buildings が未設定です）';
+  }
+
+  /* ================= 情報パネル ================= */
+  const infoRows = [
+    ['checkedAt',      '確認日'],
+    ['checkedBy',      '確認者'],
+    ['dataYear',       'データ年度'],
+    ['spec',           '製品仕様'],
+    ['cesiumVersion',  'CesiumJS'],
+    ['tilesetLabel',   '建築物モデル'],
+    ['tilesetUrl',     'tileset URL'],
+    ['tilesetStatus',  '建築物の状態'],
+    ['terrainUrl',     '地形 layer.json'],
+    ['terrainAssetId', 'Terrain アセットID'],
+    ['terrainStatus',  '地形の状態'],
+  ];
+  const infoTable = document.getElementById('infoTable');
+  const infoCells = {};
+  infoRows.forEach(function (r) {
+    const tr = document.createElement('tr');
+    const th = document.createElement('th'); th.textContent = r[1];
+    const td = document.createElement('td'); td.textContent = '—';
+    tr.appendChild(th); tr.appendChild(td); infoTable.appendChild(tr);
+    infoCells[r[0]] = td;
+  });
+  function setInfo(key, value) {
+    if (infoCells[key]) infoCells[key].textContent = value == null ? '—' : String(value);
+  }
+
+  setInfo('checkedAt', meta.checkedAt);
+  setInfo('checkedBy', meta.checkedBy || '(未記入)');
+  setInfo('dataYear', meta.dataYear);
+  setInfo('spec', meta.spec);
+  setInfo('cesiumVersion', htmlCesiumVersion + (Cesium.VERSION ? ' (実行時: ' + Cesium.VERSION + ')' : ''));
+  setInfo('terrainUrl', terrainCfg.layerJsonUrl);
+  setInfo('terrainAssetId',
+    (terrainCfg.ionAssetIdForReference != null ? terrainCfg.ionAssetIdForReference : '—') + '（参考・未使用）');
+
+  document.getElementById('copyRecord').onclick = function () {
+    const cam = readCamera();
+    const lines = [
+      '### 高さ整合の確認記録',
+      '',
+      '| 項目 | 値 |',
+      '|---|---|',
+      '| 確認日 | ' + (meta.checkedAt || '') + ' |',
+      '| 確認者 | ' + (meta.checkedBy || '') + ' |',
+      '| データ年度 | ' + (meta.dataYear || '') + '（spec ' + (meta.spec || '') + '） |',
+      '| CesiumJS | ' + htmlCesiumVersion + '（実行時 ' + (Cesium.VERSION || '不明') + '） |',
+      '| 建築物モデル | ' + (infoCells.tilesetLabel.textContent) + ' |',
+      '| tileset URL | `' + (infoCells.tilesetUrl.textContent) + '` |',
+      '| 建築物の状態 | ' + (infoCells.tilesetStatus.textContent) + ' |',
+      '| 地形 layer.json | `' + (terrainCfg.layerJsonUrl || '') + '` |',
+      '| Terrain アセットID | ' + (terrainCfg.ionAssetIdForReference != null ? terrainCfg.ionAssetIdForReference : '—') + '（参考・未使用。ion 非経由で取得） |',
+      '| 地形の状態 | ' + (infoCells.terrainStatus.textContent) + ' |',
+      '| 高さ・位置の補正 | なし（取得データをそのまま重畳） |',
+      '| 確認時のカメラ | ' + cam.text + ' |',
+      '',
+      '判定: 建物の足元が地面に接しているか → （接している / 浮いている / 沈んでいる）',
+      'ずれている場合の実測値: 約 ___ m（上 / 下）',
+    ];
+    copyText(lines.join('\n'), 'copyResult');
+  };
+
+  /* ================= カメラ座標の表示 ================= */
+  const camReadout = document.getElementById('camReadout');
+  function readCamera() {
+    const carto = viewer.camera.positionCartographic;
+    const lon = Cesium.Math.toDegrees(carto.longitude);
+    const lat = Cesium.Math.toDegrees(carto.latitude);
+    const h   = carto.height;
+    const heading = Cesium.Math.toDegrees(viewer.camera.heading);
+    const pitch   = Cesium.Math.toDegrees(viewer.camera.pitch);
+    return {
+      lon: lon, lat: lat, height: h, heading: heading, pitch: pitch,
+      text: 'lon ' + lon.toFixed(6) + ' / lat ' + lat.toFixed(6) +
+            ' / 高さ ' + h.toFixed(0) + 'm / heading ' + heading.toFixed(0) +
+            '° / pitch ' + pitch.toFixed(0) + '°',
+    };
+  }
+  let lastReadout = 0;
+  viewer.scene.postRender.addEventListener(function () {
+    const now = performance.now();
+    if (now - lastReadout < 200) return;
+    lastReadout = now;
+    camReadout.textContent = 'カメラ位置: ' + readCamera().text;
+  });
+  document.getElementById('copyCam').onclick = function () {
+    const c = readCamera();
+    copyText(
+      '{ label: \'\', lon: ' + c.lon.toFixed(6) + ', lat: ' + c.lat.toFixed(6) +
+      ', height: ' + Math.round(c.height) + ', heading: ' + Math.round(c.heading) +
+      ', pitch: ' + Math.round(c.pitch) + ' },', null);
+  };
+
+  function copyText(text, resultElId) {
+    const done = function (ok) {
+      if (!resultElId) return;
+      const el = document.getElementById(resultElId);
+      el.textContent = ok ? 'コピーしました' : 'コピーに失敗';
+      setTimeout(function () { el.textContent = ''; }, 2500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { fallback(); });
+    } else {
+      fallback();
+    }
+    function fallback() {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      done(ok);
+      if (!ok) window.prompt('下のテキストを手動でコピーしてください', text);
+    }
+  }
+
+  /* ================= 帰属表示 ================= */
+  document.getElementById('attrTerrain').textContent =
+    '地形: ' + (terrainCfg.attribution || 'PLATEAU | Mapterhorn | 国土地理院') + '　／　';
+  document.getElementById('attrBuildings').textContent =
+    (cfg.buildingsAttribution || '');
+  const extra = (disp.extraAttributions || []).join(' ／ ');
+  document.getElementById('attrExtra').textContent = extra ? '　／　' + extra : '';
+
+  /* ================= 起動 ================= */
+  const bi = typeof cfg.defaultBuildingIndex === 'number' ? cfg.defaultBuildingIndex : 0;
+  const ci = typeof cfg.defaultCameraIndex === 'number' ? cfg.defaultCameraIndex : 0;
+  flyTo(ci, true);
+  loadBuildings(bi);
+})();
+</script>
+</body>
+</html>

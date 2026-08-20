@@ -15,7 +15,7 @@
 | 1 | A. データセットの特定（年度・LOD・URL） | **✅ 完了** | 2026-08-20 |
 | 2 | B. 都南大橋周辺の収録範囲（地物型ごと） | **✅ 主要部分完了**（LOD2 範囲は Step 4 へ、道路・土地利用は任意） | 2026-08-20 |
 | 3 | C. 地形（PLATEAU-Terrain）の入手経路確認 | **✅ ほぼ完了**（layer.json の実測のみ残） | 2026-08-20 |
-| 4 | D. 高さ整合の実測 | ⏳ 未着手 | |
+| 4 | D. 高さ整合の実測 | 🛠 検証ページ作成済み（`verify/height-alignment.html`）／実測待ち | |
 | 5 | E. Cesium ion トークンの安全設定 | ⏳ 未着手 | |
 | 6 | F. 昼夜ライティングの動作確認 | ⏳ 未着手 | |
 | 7 | G. ライセンス・出典 | ⏳ 未着手 | |
@@ -606,7 +606,26 @@ done
 
 ## D. 高さ整合の実測（Phase 1 の合否を左右する）
 
-最小の HTML（公式チュートリアルのサンプルを流用）で確認します。
+**検証用ページを用意しました：`verify/height-alignment.html`**
+実行方法は [`verify/README.md`](../verify/README.md) を参照してください。
+
+- CesiumJS を CDN から読み込む単体 HTML（**バージョン 1.117 に固定**）。npm / Vite / React は使わない。
+- 地形は **Cesium ion 非経由の直接配信**（`https://tile.plateauview.mlit.go.jp/terrain/layer.json`）。
+- 建築物は **`latest` 指定の複合 tileset.json**（LOD1 / LOD2 を切替可能）。
+- **高さ補正・位置補正は一切かけていない。** 取得データをそのまま重ねている。
+- 設定は `verify/config.local.js`（`config.example.js` からコピー。`.gitignore` 済み）。
+- 地形または建築物の読み込みに失敗した場合は、画面中央にエラーを表示する。
+- 右上の「記録用テキストをコピー」で、下の記録表に貼り付けられる形式が得られる。
+
+### D-0. 記録（`verify/height-alignment.html` の出力を貼り付ける）
+
+```
+（ここに「記録用テキストをコピー」の内容を貼り付ける）
+```
+
+スクリーンショットは `docs/images/` に置き、ここから参照する。
+最低 1 枚（カメラプリセット「④ 低高度（足元確認）」）。LOD1 と LOD2 の比較があればなお良い。
+
 
 ### D-1. PLATEAU-Terrain ＋ PLATEAU 建築物 3D Tiles
 
