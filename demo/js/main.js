@@ -89,6 +89,15 @@ bmSel.innerHTML = BASEMAPS.map((b) => `<option value="${b.id}">${esc(b.label)}</
 bmSel.value = DEFAULT_BASEMAP;
 bmSel.onchange = () => setBaseMap(bmSel.value);
 
+/* ---------- 地形なしの暫定表示 ---------- */
+document.getElementById('btnNoTerrain').onclick = () => {
+  viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+  terrainOk = false;
+  setTerrainStatus('<b class="warn">地形なしで表示中（暫定）</b><br>' +
+    '地面は平らに描かれ、建物は本来の高さより浮いて見えます。高低差・目線高さは正しくありません。');
+  errBox.style.display = 'none';
+};
+
 /* ---------- 地盤標高の取得（失敗を握りつぶさない） ---------- */
 async function groundHeight(lon, lat) {
   const carto = Cesium.Cartographic.fromDegrees(lon, lat);
@@ -101,13 +110,44 @@ async function groundHeight(lon, lat) {
   return null; // 取得できなかった
 }
 
-(async () => {
+const tStat = document.getElementById('terrainStatus');
+let terrainOk = false;
+function setTerrainStatus(html) { tStat.innerHTML = html; }
+
+async function diagnoseTerrain() {
+  // layer.json に直接届くかを確認して、原因を切り分ける
   try {
-    viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
-      DATA.terrainLayerJson, { requestVertexNormals: true });
+    const res = await fetch(DATA.terrainLayerJson, { cache: 'no-store' });
+    if (!res.ok) return `layer.json の取得に失敗（HTTP ${res.status}）`;
+    const j = await res.json();
+    return `layer.json OK（maxzoom ${j.maxzoom ?? '?'} / ${j.format ?? '?'}）`;
   } catch (e) {
+    return `layer.json を取得できません: ${e.message}（CORS か通信の問題の可能性）`;
+  }
+}
+
+(async () => {
+  const diag = await diagnoseTerrain();
+  setTerrainStatus(`地形サーバー: ${esc(diag)}`);
+  try {
+    const tp = await Cesium.CesiumTerrainProvider.fromUrl(
+      DATA.terrainLayerJson, { requestVertexNormals: true });
+    let reported = false;
+    tp.errorEvent?.addEventListener?.((err) => {
+      if (reported) return;
+      reported = true;
+      const msg = (err && (err.message || err.error?.message)) || String(err);
+      setTerrainStatus(`<b class="warn">地形タイルの取得に失敗</b><br>${esc(msg)}<br>${esc(diag)}`);
+      showError('地形タイルを取得できませんでした', msg,
+        '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
+    });
+    viewer.terrainProvider = tp;
+    terrainOk = true;
+    setTerrainStatus(`地形: 読み込み成功<br>${esc(diag)}`);
+  } catch (e) {
+    setTerrainStatus(`<b class="warn">地形を読み込めませんでした</b><br>${esc(e.message)}<br>${esc(diag)}`);
     showError('地形を読み込めませんでした', e.message,
-      '地形なしで続行します。高低差・目線高さは正しく表示されません。');
+      '「地形なしで表示（暫定）」を押すと地図だけ表示できます（高さは正しくありません）。');
   }
   setBaseMap(DEFAULT_BASEMAP);
   await loadBuildings('lod1');
