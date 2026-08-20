@@ -210,10 +210,12 @@ curl -s --compressed https://api.plateauview.mlit.go.jp/datacatalog/plateau-data
 1. まず確認対象の位置を決める。**都南大橋の下流側・北上川河川敷（花火会場）の座標**と、
    そこから半径 1km・3km の範囲。
 2. 次のいずれかで実データを見る。
-   - **PLATEAU VIEW** でデータカタログから盛岡市の各モデルを ON にし、
+   - **PLATEAU VIEW 5.0** でデータカタログから盛岡市の各モデルを ON にし、
      当該範囲へカメラを移動して**目視**する（最も速い）。
-     入口：`https://www.mlit.go.jp/plateau/plateau-view-app/` → 「ブラウザで実行」
-     （⚠️ `www.plateau-view.mlit.go.jp` というホストは**存在しない**。DNS で解決できないことを確認済み）
+     - アプリ本体：**`https://plateauview.mlit.go.jp/`**（✅ 2026-08-20 実アクセスで確認）
+     - 入口ページ：`https://www.mlit.go.jp/plateau/plateau-view-app/` →「PLATEAU VIEW 5.0 - Run in Browser」
+     - ⚠️ `www.plateau-view.mlit.go.jp` というホストは**存在しない**（DNS で解決できないことを確認済み）
+     - PLATEAU VIEW 自体も CesiumJS + Cesium ion で構築されている（画面左下の帰属表示で確認）
    - カタログ API で得た URL を CesiumJS / MapLibre に読ませて目視する。
    - G空間情報センターの盛岡市データセットページに**整備範囲図**があれば併読する。
    - CityGML をダウンロードし、収録メッシュ番号から範囲を判定する

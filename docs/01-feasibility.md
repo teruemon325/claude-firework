@@ -117,7 +117,7 @@
 [`05-verification-checklist.md` の B-2](05-verification-checklist.md#b-2-記録表4-つとも埋めること) にあります。
 
 - 確認方法（いずれか）：
-  - PLATEAU VIEW（入口 `https://www.mlit.go.jp/plateau/plateau-view-app/` の「ブラウザで実行」）で盛岡市の各モデルを表示し、
+  - PLATEAU VIEW（`https://plateauview.mlit.go.jp/` ✅実アクセス確認済み。入口は `https://www.mlit.go.jp/plateau/plateau-view-app/`）で盛岡市の各モデルを表示し、
     都南大橋周辺にデータがあるか目視する（最速）。
   - カタログ API から取得した URL を CesiumJS / MapLibre に読ませ、都南大橋周辺へカメラを飛ばす。
   - G空間情報センターの盛岡市データセットページで「整備範囲図」があれば確認する。
