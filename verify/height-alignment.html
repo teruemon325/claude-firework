@@ -16,6 +16,19 @@
     花火の表示 / 観覧地点の選択 / 距離・方位の計算 / 交通規制の表示 /
     建物の高さ補正・位置補正（modelMatrix によるオフセット等）
 
+  地形の読み込み方法:
+    このページは「直接 URL から読む方式」だけを実装している。
+      Cesium.CesiumTerrainProvider.fromUrl(layer.json の URL)
+      → Cesium ion のトークンは不要。Terrain アセット ID は該当なし。
+    Cesium ion 経由（fromIonAssetId）は実装していない。
+    そちらはトークンとアセット ID の両方が必要になる。詳細は verify/README.md。
+
+  カメラの座標について:
+    config.local.js の cameras[] は「画面の初期表示位置」でしかない。
+    基準にしている都南大橋付近の座標は【地図サービスによる参考値】であり、
+    公式な実測値ではない。また【花火の打上地点ではない】。
+    打上地点の推定は Phase 0 の Step 8（docs/05 の H）で別途扱う。
+
   CesiumJS のバージョンはここで固定している。
   変更する場合は下の 3 か所（css / js / data-cesium-version）をすべて合わせ、
   verify/config.local.js の meta.cesiumVersion も更新すること。
@@ -102,7 +115,10 @@
   <div class="row" id="buildingButtons"></div>
   <div class="hint">
     右ドラッグ／Ctrl+ドラッグ で視点を傾けられます。<br />
-    <span class="warn">高さ補正は一切かけていません。</span>取得データをそのまま重ねています。
+    <span class="warn">高さ補正は一切かけていません。</span>取得データをそのまま重ねています。<br />
+    <span class="warn">カメラ座標は画面の初期表示位置です。</span>
+    都南大橋付近の基準値は地図サービスによる参考値であり、公式な実測値ではありません。
+    <b>花火の打上地点ではありません。</b>
   </div>
 </div>
 
@@ -193,9 +209,21 @@
       'どちらかに合わせてください。記録の正確さに関わります。');
   }
 
-  // ion は使わない構成。設定されている場合のみ適用する
+  // このページは地形を「直接 URL 方式」でのみ読み込む。Cesium ion は使わない。
+  // 誤って ion 用の設定が書かれていたら、実装と食い違うので明示的に知らせる。
+  if (cfg.terrain && (cfg.terrain.ionAssetId != null || cfg.terrain.ionAssetIdForReference != null)) {
+    showError('地形の読み込み方法の設定が実装と一致しません',
+      'config.local.js の terrain に ion のアセット ID が指定されていますが、' +
+      'このページは fromIonAssetId を実装していません。',
+      '地形は <code>terrain.layerJsonUrl</code> からの直接 URL 方式でのみ読み込みます。' +
+      'ion 経由を試す場合は verify/README.md の手順を参照してください。');
+  }
   if (cfg.cesiumIonToken) {
+    // 直接 URL 方式では不要。設定されていても地形の取得には使われない。
     Cesium.Ion.defaultAccessToken = cfg.cesiumIonToken;
+    showError('Cesium ion のトークンが設定されています',
+      'このページの地形は Cesium ion を使わない直接 URL 方式で読み込むため、トークンは不要です。',
+      '不要であれば config.local.js の <code>cesiumIonToken</code> を <code>null</code> に戻してください。');
   }
 
   /* ================= Viewer ================= */
@@ -372,6 +400,7 @@
     ['tilesetLabel',   '建築物モデル'],
     ['tilesetUrl',     'tileset URL'],
     ['tilesetStatus',  '建築物の状態'],
+    ['terrainMode',    '地形の読み込み方法'],
     ['terrainUrl',     '地形 layer.json'],
     ['terrainAssetId', 'Terrain アセットID'],
     ['terrainStatus',  '地形の状態'],
@@ -394,9 +423,9 @@
   setInfo('dataYear', meta.dataYear);
   setInfo('spec', meta.spec);
   setInfo('cesiumVersion', htmlCesiumVersion + (Cesium.VERSION ? ' (実行時: ' + Cesium.VERSION + ')' : ''));
+  setInfo('terrainMode', '直接URL方式（CesiumTerrainProvider.fromUrl / Cesium ion 不使用）');
   setInfo('terrainUrl', terrainCfg.layerJsonUrl);
-  setInfo('terrainAssetId',
-    (terrainCfg.ionAssetIdForReference != null ? terrainCfg.ionAssetIdForReference : '—') + '（参考・未使用）');
+  setInfo('terrainAssetId', '該当なし（ion のアセットではないため）');
 
   document.getElementById('copyRecord').onclick = function () {
     const cam = readCamera();
@@ -412,11 +441,15 @@
       '| 建築物モデル | ' + (infoCells.tilesetLabel.textContent) + ' |',
       '| tileset URL | `' + (infoCells.tilesetUrl.textContent) + '` |',
       '| 建築物の状態 | ' + (infoCells.tilesetStatus.textContent) + ' |',
+      '| 地形の読み込み方法 | 直接URL方式（`CesiumTerrainProvider.fromUrl`）/ Cesium ion 不使用 |',
       '| 地形 layer.json | `' + (terrainCfg.layerJsonUrl || '') + '` |',
-      '| Terrain アセットID | ' + (terrainCfg.ionAssetIdForReference != null ? terrainCfg.ionAssetIdForReference : '—') + '（参考・未使用。ion 非経由で取得） |',
+      '| Terrain アセットID | 該当なし（ion のアセットではないため） |',
       '| 地形の状態 | ' + (infoCells.terrainStatus.textContent) + ' |',
       '| 高さ・位置の補正 | なし（取得データをそのまま重畳） |',
       '| 確認時のカメラ | ' + cam.text + ' |',
+      '',
+      '※ カメラ座標は画面の初期表示位置。都南大橋付近の基準値は地図サービスによる参考値であり、',
+      '　 公式な実測値ではなく、花火の打上地点でもない。',
       '',
       '判定: 建物の足元が地面に接しているか → （接している / 浮いている / 沈んでいる）',
       'ずれている場合の実測値: 約 ___ m（上 / 下）',

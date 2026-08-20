@@ -610,7 +610,11 @@ done
 実行方法は [`verify/README.md`](../verify/README.md) を参照してください。
 
 - CesiumJS を CDN から読み込む単体 HTML（**バージョン 1.117 に固定**）。npm / Vite / React は使わない。
-- 地形は **Cesium ion 非経由の直接配信**（`https://tile.plateauview.mlit.go.jp/terrain/layer.json`）。
+- **地形の読み込み方法は「直接 URL 方式」のみを実装**している。
+  `CesiumTerrainProvider.fromUrl('https://tile.plateauview.mlit.go.jp/terrain/layer.json')`
+  → **Cesium ion のトークンは不要。Terrain アセット ID は「該当なし」。**
+  Cesium ion 経由（`fromIonAssetId`、トークンとアセット ID `3258112` の両方が必要）は
+  **実装していない**。切り替え手順は `verify/README.md` に記載。
 - 建築物は **`latest` 指定の複合 tileset.json**（LOD1 / LOD2 を切替可能）。
 - **高さ補正・位置補正は一切かけていない。** 取得データをそのまま重ねている。
 - 設定は `verify/config.local.js`（`config.example.js` からコピー。`.gitignore` 済み）。
@@ -625,6 +629,15 @@ done
 
 スクリーンショットは `docs/images/` に置き、ここから参照する。
 最低 1 枚（カメラプリセット「④ 低高度（足元確認）」）。LOD1 と LOD2 の比較があればなお良い。
+
+> ### ⚠️ 検証ページのカメラ座標について
+>
+> `verify/config.example.js` の `cameras[]` が基準にしている
+> **`lon 141.17185 / lat 39.65975`（都南大橋付近）は、地図サービスによる参考値**である。
+> 公式な実測値ではない（測量成果でも、主催者・道路管理者の公表値でもない）。
+>
+> **これは「花火の打上地点」ではない。** カメラの初期表示位置にすぎない。
+> 打上地点の推定座標は **H（Step 8）で別途決める**。両者を混同しないこと。
 
 
 ### D-1. PLATEAU-Terrain ＋ PLATEAU 建築物 3D Tiles

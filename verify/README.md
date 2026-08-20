@@ -29,7 +29,52 @@ PLATEAU-Terrain（Cesium ion 非経由の直接配信）と PLATEAU の建築物
 | `README.md` | この文書 | コミットする |
 
 - npm / Vite / React は使いません。**CesiumJS は CDN から読み込み、バージョンは `1.117` に固定**しています。
-- Cesium ion のトークンは**不要**です。地形は直接配信 URL から取得します。
+- Cesium ion のトークンは**不要**です（次節）。
+
+## 地形の読み込み方法
+
+地形（PLATEAU-Terrain）の読み込みには 2 つの方式があります。
+**このページは (A) だけを実装しています。**
+
+### (A) 直接 URL から読む方式 ← このページが使う方式
+
+```js
+Cesium.CesiumTerrainProvider.fromUrl(
+  'https://tile.plateauview.mlit.go.jp/terrain/layer.json',
+  { requestVertexNormals: true }
+);
+```
+
+| 項目 | 内容 |
+|---|---|
+| Cesium ion のアカウント | **不要** |
+| アクセストークン | **不要** |
+| **Terrain アセット ID** | **該当なし**（ion のアセットではないため） |
+| 位置づけ | 公式ドキュメントが推奨する方式 |
+
+情報パネルの「Terrain アセット ID」も **「該当なし」** と表示されます。
+`config.local.js` の `terrain` に ion のアセット ID を書くと、実装と食い違うため画面にエラーが出ます。
+
+### (B) Cesium ion 経由（`fromIonAssetId`）← このページでは使いません
+
+```js
+Cesium.Ion.defaultAccessToken = '<アクセストークン>';
+Cesium.CesiumTerrainProvider.fromIonAssetId(3258112);
+```
+
+| 項目 | 内容 |
+|---|---|
+| Cesium ion のアカウント | **必要** |
+| アクセストークン | **必要** |
+| **Terrain アセット ID** | **必要**（公式ドキュメント記載値は `3258112`） |
+| 位置づけ | 2024 年度以前から提供されている terraindb 形式。公式は (A) を推奨 |
+
+この方式を試す場合は、`height-alignment.html` の `CesiumTerrainProvider.fromUrl(...)` を
+`fromIonAssetId(...)` に書き換え、トークンを `config.local.js` の `cesiumIonToken` に設定します。
+**トークンは `config.example.js` には書かないでください**（`config.local.js` のみ。`.gitignore` 済み）。
+なお、フロントエンドに書いたトークンはブラウザから読み取れるため、秘密にはできません。
+
+出典: <https://docs.plateauview.mlit.go.jp/datasets/terrain/>
 
 ## 実行手順
 
@@ -43,9 +88,19 @@ cp verify/config.example.js verify/config.local.js
 
 - `meta.checkedAt` … 確認を実施する日
 - `meta.checkedBy` … 確認者（任意）
-- `cameras[]` の座標 … **⚠️ 初期値は都南大橋の「推定座標」です。正確ではありません。**
-  ページ左下にカメラ座標が出るので、実際に都南大橋の上へ移動して読み取り、
-  「この位置をコピー」ボタンで得た行に差し替えてください。
+- `cameras[]` の座標 … 下記の注意を必ず読んでください
+
+#### ⚠️ カメラ座標についての注意
+
+- `cameras[]` は **画面の初期表示位置**でしかありません。それ以上の意味はありません。
+- 基準にしている都南大橋付近の座標 `lon 141.17185 / lat 39.65975` は
+  **地図サービスによる参考値**です。**公式な実測値ではありません**
+  （測量成果でも、主催者・道路管理者が公表した値でもありません）。
+- **この座標は「花火の打上地点」ではありません。** 打上地点の緯度経度は公表されておらず、
+  その推定は Phase 0 の Step 8（`docs/05-verification-checklist.md` の H）で別途扱います。
+  **混同しないでください。**
+- ②③④ の座標は①を基準に機械的に振っただけです。ページ左下に現在のカメラ座標が出るので、
+  実際に動かして良い画角にし、「この位置をコピー」ボタンで得た行に差し替えてください。
 
 ### 2. ローカル HTTP サーバーを起動する
 
@@ -81,7 +136,7 @@ WebGL2 が有効な最近のブラウザ（Chrome / Edge / Firefox / Safari）�
 | 位置 | 内容 |
 |---|---|
 | 左上 | カメラ位置のプリセット、建築物モデル（LOD1 / LOD2）の切替 |
-| 右上 | 記録用の情報（確認日・データ年度・tileset URL・地形 URL・CesiumJS バージョン・読み込み状態）と「記録用テキストをコピー」ボタン |
+| 右上 | 記録用の情報（確認日・データ年度・tileset URL・**地形の読み込み方法**・地形 URL・Terrain アセット ID・CesiumJS バージョン・読み込み状態）と「記録用テキストをコピー」ボタン |
 | 左下 | 現在のカメラ座標。「この位置をコピー」で `config.local.js` の `cameras[]` に貼れる形式になります |
 | 下部の黒帯 | 帰属表示（**必須**）。`PLATEAU \| Mapterhorn \| 国土地理院` と PLATEAU の出典 |
 | 中央（赤） | 読み込みエラー。地形または建築物の取得に失敗すると表示されます |
