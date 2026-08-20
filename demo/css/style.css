@@ -1,0 +1,68 @@
+:root{color-scheme:light;--red:#e11d48;--ink:#111;--mut:#555;--line:rgba(0,0,0,.16)}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;
+  font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;color:var(--ink)}
+#cesiumContainer{position:absolute;inset:0}
+.panel{position:absolute;z-index:10;background:rgba(255,255,255,.95);border:1px solid var(--line);
+  border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.2);font-size:12px;line-height:1.65}
+#controls{top:52px;left:10px;width:290px;padding:12px;max-height:calc(100vh - 130px);overflow:auto}
+#ranking{top:52px;right:10px;width:390px;padding:12px;max-height:calc(100vh - 130px);overflow:auto}
+#detail{bottom:52px;left:312px;width:430px;padding:12px;max-height:calc(100vh - 130px);overflow:auto;display:none}
+#detail .cls{float:right;cursor:pointer;color:#666;font-size:14px;line-height:1}
+
+#topbar{position:absolute;z-index:12;top:0;left:0;right:0;height:44px;display:flex;align-items:center;
+  gap:12px;padding:0 12px;background:#0f172a;color:#fff;font-size:13px}
+#topbar .title{font-weight:700}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.badge.demo{background:#fbbf24;color:#4a2c00}
+.badge.year{background:#334155;color:#e2e8f0}
+#bottombar{position:absolute;z-index:12;left:0;right:0;bottom:0;padding:6px 12px;
+  background:rgba(0,0,0,.78);color:#fff;font-size:11px;line-height:1.5}
+#bottombar a{color:#93c5fd}
+
+h3{margin:0 0 8px;font-size:12px;letter-spacing:.04em;color:#333}
+h4{margin:12px 0 6px;font-size:12px}
+label.fld{display:block;margin-bottom:10px}
+label.fld > span{display:block;color:var(--mut);margin-bottom:3px;font-size:11px}
+select,input[type=range]{width:100%;font:inherit;font-size:12px}
+select{padding:4px;border:1px solid #bbb;border-radius:6px;background:#fff}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+button{font:inherit;font-size:11px;padding:5px 9px;cursor:pointer;border:1px solid #bbb;
+  border-radius:6px;background:#fff}
+button:hover{background:#f1f5f9}
+button[aria-pressed=true]{background:#0f766e;border-color:#0f766e;color:#fff}
+.hint{color:var(--mut);font-size:11px;margin-top:6px}
+.warn{color:#92400e}
+.chk{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px}
+
+.card{border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;cursor:pointer;background:#fff}
+.card:hover{background:#f8fafc}
+.card.sel{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.18)}
+.card .hd{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .nm{font-weight:700;font-size:12.5px}
+.card .sc{font-weight:700;font-size:15px;color:#0f766e;white-space:nowrap}
+.card .mt{color:var(--mut);font-size:11px;margin-top:3px}
+.rank{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;
+  border-radius:5px;background:#0f172a;color:#fff;font-size:11px;font-weight:700;margin-right:6px}
+
+.bar{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin:3px 0 2px}
+.bar > i{display:block;height:100%;background:#0f766e}
+.lv{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700}
+.lv.低い{background:#dcfce7;color:#14532d}
+.lv.中程度{background:#fef3c7;color:#78350f}
+.lv.高い{background:#fee2e2;color:#7f1d1d}
+
+ul.tight{margin:4px 0 0;padding-left:18px}
+ul.tight li{margin-bottom:2px}
+.legend-swatch{display:inline-block;width:16px;height:5px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.src{color:var(--mut);font-size:10.5px;border-top:1px dashed var(--line);margin-top:8px;padding-top:6px}
+
+#modal{position:absolute;inset:0;z-index:40;background:rgba(15,23,42,.72);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+#modal .box{background:#fff;border-radius:12px;max-width:660px;max-height:82vh;overflow:auto;padding:20px 22px}
+#modal h2{margin:0 0 10px;font-size:17px}
+#modal p,#modal li{font-size:12.5px;line-height:1.8}
+#errors{position:absolute;z-index:50;top:50%;left:50%;transform:translate(-50%,-50%);
+  max-width:min(640px,90vw);padding:16px 18px;border-radius:10px;background:#7f1d1d;color:#fff;
+  font-size:13px;line-height:1.7;display:none;box-shadow:0 6px 30px rgba(0,0,0,.4)}
+#errors .close{float:right;cursor:pointer}

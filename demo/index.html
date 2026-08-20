@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>盛岡花火3D見え方シミュレーター（デモ版）</title>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js" data-cesium-version="1.117"></script>
+<link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+
+<div id="topbar">
+  <span class="title">盛岡花火3D見え方シミュレーター</span>
+  <span class="badge demo">デモ版</span>
+  <span class="badge year" id="yearBadge">—</span>
+  <span id="topNote" style="font-size:11px;opacity:.85"></span>
+  <span style="margin-left:auto"><button id="openInfo" type="button" style="background:#1e293b;color:#fff;border-color:#334155">出典・注意事項</button></span>
+</div>
+
+<div id="cesiumContainer"></div>
+
+<div id="controls" class="panel">
+  <h3>表示の設定</h3>
+
+  <label class="fld">
+    <span>時間帯（混雑・渋滞予測に使います）</span>
+    <select id="timeSlot"></select>
+  </label>
+
+  <label class="fld">
+    <span>花火の高度（地上高）: <b id="altLabel">200</b> m</span>
+    <input type="range" id="altitude" min="50" max="300" step="10" value="200" />
+  </label>
+
+  <h4>レイヤー</h4>
+  <label class="chk"><input type="checkbox" id="chkBuildings" checked /> 建築物モデル</label>
+  <label class="chk"><input type="checkbox" id="chkRegulation" checked /> 交通規制（赤色）</label>
+  <div class="row">
+    <button id="btnLod1" type="button" aria-pressed="true">LOD1</button>
+    <button id="btnLod2" type="button" aria-pressed="false">LOD2</button>
+  </div>
+
+  <h4>表示モード</h4>
+  <div class="row">
+    <button id="btnDay" type="button" aria-pressed="false">昼</button>
+    <button id="btnNight" type="button" aria-pressed="true">夜</button>
+  </div>
+  <div class="row">
+    <button id="btnOverview" type="button">会場を俯瞰</button>
+  </div>
+
+  <h4 id="legendTitle">交通規制の凡例</h4>
+  <div id="legend"></div>
+
+  <div class="hint warn" id="bridgeNote"></div>
+</div>
+
+<div id="ranking" class="panel">
+  <h3>観覧候補地点のランキング（参考）</h3>
+  <div class="hint">
+    設定ファイルに登録した候補地点だけを評価しています。任意の場所を自動でおすすめするものではありません。
+    <b>「必ず見える」「安全」「公式の穴場」を意味するものではありません。</b>
+  </div>
+  <div id="rankList" style="margin-top:10px"></div>
+</div>
+
+<div id="detail" class="panel"></div>
+
+<div id="bottombar">
+  <span id="attr"></span>
+</div>
+
+<div id="modal">
+  <div class="box">
+    <h2>このデモ版について（必ずお読みください）</h2>
+    <p><b>これはデモ版です。</b>座標・評価値・混雑予測は、デモ用の概算値および仮の設定値であり、公式に確認された値ではありません。</p>
+    <ul>
+      <li>本アプリは、3D都市モデルと地形データを使って花火の「おおよその見え方」を考えるための<b>参考ツール</b>です。</li>
+      <li>特定の場所から花火が<b>「必ず見える」ことを示すものではありません</b>。</li>
+      <li>ランキングは参考の目安です。<b>「安全」「公式の穴場」を意味するものではありません。</b></li>
+      <li>次のものは再現していません：河川敷の草木・樹木・電柱・電線・看板・仮設物・工事中の構造物・当日の人や車・煙・靄・雲・天候・光害。</li>
+      <li>とくに<b>花火会場の河川敷は、モデル上では何も無い開けた空間として表示されます</b>が、実際には草木や当日の仮設物・観覧者・車両があります。<b>モデル上で開けて見えても、実際には遮るものがある場合があります。</b></li>
+      <li>建物の高さは点群の中央値をもとに簡略化されています。屋根の棟・塔屋・屋上の設備などは表示されておらず、<b>実際の建物はモデルより高い場合があります</b>。</li>
+      <li>建築物データは 2024年度に整備されたものですが、<b>建物の調査年は 2018年</b>など、より古い場合があります。</li>
+      <li>打上地点の座標は公表されていないため、<b>公表情報を基にした推定値</b>です。</li>
+      <li>表示している場所が、立ち入り可能な場所・観覧可能な場所であることを保証しません。<b>私有地・立入禁止区域・河川管理用道路・交通規制区域には立ち入らないでください。</b></li>
+      <li>交通規制の表示は、公表内容を基に再作図した<b>概略図</b>です。公式の図をそのまま転載したものではありません。<b>最新かつ正確な情報は主催者の公式発表を確認してください。</b></li>
+      <li>混雑・渋滞は<b>「予測」</b>であり、<b>リアルタイム情報ではありません</b>。実際の混雑・渋滞を保証するものではありません。</li>
+      <li>観覧の際は、主催者・警察・道路管理者・河川管理者の指示に必ず従ってください。</li>
+    </ul>
+    <div id="modalSources" class="src"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button id="agree" type="button" style="background:#0f766e;border-color:#0f766e;color:#fff;padding:8px 18px;font-size:13px">理解しました</button>
+    </div>
+  </div>
+</div>
+
+<div id="errors"><span class="close" id="errClose">✕</span><div id="errBody"></div></div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

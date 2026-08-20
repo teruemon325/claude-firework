@@ -1,0 +1,116 @@
+{
+  "type": "FeatureCollection",
+  "name": "morioka-hanabi-traffic-regulation-2026",
+  "metadata": {
+    "eventYear": 2026,
+    "eventName": "盛岡花火の祭典",
+    "source": "盛岡花火の祭典実行委員会（盛岡商工会議所）公表情報",
+    "sourceUrl": "https://www.ccimorioka.or.jp/hanabi/",
+    "createdAt": "2026-08-20",
+    "note": "公式PDF等の図をそのまま転載したものではなく、公表内容を基に再作図した【概略図】です。区間の線形・端点は概算であり、正確な範囲を示すものではありません。最新かつ正確な情報は主催者の公式発表を確認してください。",
+    "disclaimer": "デモ版。座標は概算値です。"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "reg-1",
+        "name": "盛岡南IC入口交差点 〜 国道396号 都南大橋東袂交差点",
+        "kind": "vehicle_closed",
+        "timeStart": "18:00",
+        "timeEnd": "21:30",
+        "timeRange": "18:00〜21:30",
+        "detail": "車両通行止め。都南大橋を含む区間です。",
+        "published": "2026",
+        "source": "盛岡花火の祭典実行委員会 公表情報",
+        "officialUrl": "https://www.ccimorioka.or.jp/hanabi/",
+        "note": "公表内容を基に作成した概略。線形・端点は概算。"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [141.1490, 39.6540],
+          [141.1545, 39.6553],
+          [141.1600, 39.6570],
+          [141.1650, 39.6582],
+          [141.1700, 39.65965],
+          [141.1745, 39.65985],
+          [141.1760, 39.6600]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "reg-2",
+        "name": "都南大橋（全面通行禁止区間）",
+        "kind": "bridge_closed",
+        "timeStart": "18:00",
+        "timeEnd": "21:30",
+        "timeRange": "18:00〜21:30",
+        "detail": "都南大橋は上記の車両通行止め区間に含まれます。規制時間帯は全面通行禁止として扱ってください。",
+        "published": "2026",
+        "source": "盛岡花火の祭典実行委員会 公表情報（規制区間に都南大橋東袂交差点までが含まれることによる）",
+        "officialUrl": "https://www.ccimorioka.or.jp/hanabi/",
+        "note": "橋そのものの規制形態は公表文からの解釈です。要確認。"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [141.1700, 39.65965],
+          [141.1722, 39.65975],
+          [141.1745, 39.65985]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "reg-3",
+        "name": "ふれあいランド岩手前通り",
+        "kind": "vehicle_closed",
+        "timeStart": "18:00",
+        "timeEnd": "21:30",
+        "timeRange": "18:00〜21:30",
+        "detail": "車両通行止め。",
+        "published": "2026",
+        "source": "盛岡花火の祭典実行委員会 公表情報",
+        "officialUrl": "https://www.ccimorioka.or.jp/hanabi/",
+        "note": "公表内容を基に作成した概略。線形・端点は概算。"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [141.1625, 39.6532],
+          [141.1655, 39.6548],
+          [141.1685, 39.6563]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "reg-4",
+        "name": "河川管理用道路",
+        "kind": "river_road_closed",
+        "timeStart": "前日09:00",
+        "timeEnd": "当日22:00",
+        "timeRange": "前日9:00〜大会当日22:00",
+        "detail": "通行できません。立ち入り・駐車はしないでください。観覧候補地としても登録していません。",
+        "published": "2026",
+        "source": "盛岡花火の祭典実行委員会 公表情報",
+        "officialUrl": "https://www.ccimorioka.or.jp/hanabi/",
+        "note": "公表内容を基に作成した概略。線形・端点は概算。"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [141.1698, 39.6600],
+          [141.1703, 39.6570],
+          [141.1710, 39.6540],
+          [141.1718, 39.6505]
+        ]
+      }
+    }
+  ]
+}
