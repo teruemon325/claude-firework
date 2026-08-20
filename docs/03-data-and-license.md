@@ -5,7 +5,7 @@
 | # | データ | 取得元 | 形式 | 取得方法 | 必須 |
 |---|---|---|---|---|---|
 | 1 | 盛岡市 建築物モデル | PLATEAU 配信サービス | 3D Tiles 1.0 | カタログ API で URL 取得 → `Cesium3DTileset.fromUrl` | ◎ |
-| 2 | 地形 | PLATEAU-Terrain（Cesium ion） | quantized-mesh (.terraindb) | `CesiumTerrainProvider.fromIonAssetId(<id>)` | ◎ |
+| 2 | 地形 | PLATEAU-Terrain **直接配信**（Cesium ion 非経由） | quantized-mesh-1.0 | `CesiumTerrainProvider.fromUrl('https://tile.plateauview.mlit.go.jp/terrain/layer.json')` | ◎ |
 | 3 | 打上地点の座標 | 主催者発表＋地理院地図で目視推定 | JSON（自作） | `public/data/launch-site.json` | ◎ |
 | 4 | 交通規制区域 | 盛岡花火の祭典 公式発表 | GeoJSON（手作業で再作図） | `public/data/traffic-regulation-<年>.geojson` | ◎ |
 | 5 | 航空写真オルソ | PLATEAU-Ortho | ラスタタイル | `UrlTemplateImageryProvider`<br>`https://api.plateauview.mlit.go.jp/tiles/plateau-ortho-2023/{z}/{x}/{y}.png` | ○（昼モードの見やすさ向上） |
@@ -48,8 +48,9 @@
 【出典】
 ・3D都市モデル：国土交通省 Project PLATEAU「3D都市モデル（盛岡市）」（<採用年度>年度整備）を加工して作成
 　https://www.geospatial.jp/ckan/dataset/plateau-03201-morioka-shi-<採用年度>
-・地形データ：PLATEAU-Terrain（国土地理院 基盤地図情報 数値標高モデルより作成）
-　地形データは、測量法に基づく国土地理院長承認（使用）R3JHs 778 を得て使用
+・地形データ：PLATEAU-Terrain
+　PLATEAU | Mapterhorn | 国土地理院
+　（公式指定の帰属表示。地図画面上に必ず表示すること）
 ・航空写真：国土交通省 Project PLATEAU「PLATEAU-Ortho（2023年度）」
 ・交通規制：盛岡花火の祭典実行委員会 公表資料（20XX年発表）を基に作成した概略図
 　最新情報は主催者公式サイトをご確認ください https://www.ccimorioka.or.jp/hanabi/
@@ -62,8 +63,13 @@
   出典表記には整備年度を書き、免責文には調査年が古い場合があることを書き分ける。
   PLATEAU VIEW の属性パネルで個別建物の `調査年` を確認できる。
   ハードコードせず `config/attribution.ts` に置き、データセット URL の末尾年も合わせる。
-- PLATEAU-Terrain の承認番号（`R3JHs 778`）は公式チュートリアル記載の値。
-  ⚠️ 利用時点で最新の指定文言を公式ドキュメントで確認すること。
+- **地形の帰属表示は `PLATEAU | Mapterhorn | 国土地理院`**（公式 docs サイト「4. 帰属表示」、2026-08-20 確認）。
+  **地図画面上に必ず表示**する必要があり、フッターやモーダルの中だけでは要件を満たさない可能性がある。
+  → `AttributionBar` を地図の上に重ねて常時表示する設計にする。
+- `/terrain/layer.json` のレスポンスにも同等の `attribution` 文字列が含まれるため、
+  **ハードコードせずレスポンスから読み取って表示する**のが望ましい。
+- ⚠️ 旧記述「地形データは、測量法に基づく国土地理院長承認（使用）R3JHs 778 を得て使用」は
+  GitHub 旧チュートリアルの文言。GitHub 側は更新停止と明記されているため**採用しない**。
 - ライセンスが CC BY 4.0 の場合は、ライセンス名とリンクも併記する。
 
 ### 2.3 表示場所
