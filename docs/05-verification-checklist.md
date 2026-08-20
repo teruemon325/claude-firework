@@ -12,7 +12,7 @@
 
 | Step | 項目 | 状態 | 確認日 |
 |---|---|---|---|
-| 1 | A. データセットの特定（年度・LOD・URL） | **✅ 完了**（一部未記録あり） | 2026-08-20 |
+| 1 | A. データセットの特定（年度・LOD・URL） | **✅ 完了** | 2026-08-20 |
 | 2 | B. 都南大橋周辺の収録範囲（地物型ごと） | ⏳ 未着手 | |
 | 3 | C. PLATEAU-Terrain のアセット確認 | ⏳ 未着手 | |
 | 4 | D. 高さ整合の実測 | ⏳ 未着手 | |
@@ -124,17 +124,21 @@ curl -s --compressed https://api.plateauview.mlit.go.jp/datacatalog/plateau-data
 | `composite_url` の形（LOD2） | `https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/03201-bldg-lod2-texture…/tileset.json` |
 | `composite_url` の形（LOD2 テクスチャなし） | `https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/03201-bldg-lod2-notextu…/tileset.json` |
 | `url`（実体、バージョン固定） | `https://assets.cms.plateau.reearth.io/assets/…/03201_morioka-shi_city_2024_citygml_1_op_bldg_3dtiles_lod2/tileset.json` |
-| 完全な URL 一覧 | ⚠️ **未記録**（コンソール出力の全文を貼り付けて補完すること） |
+| 採用する URL 形式 | **`https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/03201-bldg-lod{1\|2}-latest/tileset.json`**（A-3 で疎通確認済み） |
 
 > **`composite_url` は null になり得る**（他自治体の浸水想定区域モデルで null の例を確認）。
 > 盛岡市の建築物モデルでは値が入っていることを実測で確認済み。
 
 ### A-3. 複合 tileset.json API（`latest` 指定）の疎通（実測）
 
-| spec | 結果 | 確認日 |
-|---|---|---|
-| `03201-bldg-lod2-latest` | **✅ 200（有効な tileset.json を返す）** | 2026-08-20 |
-| `03201-bldg-lod1-latest` | ⚠️ 未確認 | |
+| spec | 結果 | 実体 URL（`content.uri`） | 確認日 |
+|---|---|---|---|
+| `03201-bldg-lod1-latest` | **✅ 200** | `…/assets/ac/74a1d2-b1ea-45ca-be28-ec8309e663e6/03201_morioka-shi_city_2024_citygml_1_op_bldg_3dtiles_lod1/tileset.json` | 2026-08-20 |
+| `03201-bldg-lod2-latest` | **✅ 200** | `…/assets/01/3332d3-97b0-4854-8b28-c6f2d73b35e3/03201_morioka-shi_city_2024_citygml_1_op_bldg_3dtiles_lod2/tileset.json` | 2026-08-20 |
+
+> **✅ 採用方針：`latest` 指定の複合 tileset.json URL を使う。**
+> LOD1 / LOD2 とも有効で、年度更新時に URL を変更せずに追従できる。
+> 実体 URL（`assets.cms.plateau.reearth.io/...`）は年度・バージョンで変わるため、直接は使わない。
 
 **`03201-bldg-lod2-latest` のレスポンス内容（実測）**
 
@@ -159,11 +163,16 @@ curl -s --compressed https://api.plateauview.mlit.go.jp/datacatalog/plateau-data
 
 - 都南大橋の想定位置（およそ 北緯 39.65° / 東経 141.15°）は、**この境界の内側にある**。
 - ⚠️ **ただし `boundingVolume` は「データの外枠」であり、枠内すべてに建物が存在することの証明ではありません。**
-  会場周辺に実際に建物があるかは **B（PLATEAU VIEW での目視）で必ず確認**すること。
+- ⚠️ **さらに重要：LOD1 と LOD2 で `region` の値が完全に一致している。**
+  同一の外枠が返るということは、この値が **LOD ごとの実際のデータ分布を反映していない**
+  （市域相当の共通の外枠である）可能性が高い。したがって
+  **「LOD2 の整備範囲が LOD1 より狭いか」はこの値からは判断できない。**
+- → 会場周辺に実際に建物があるか、LOD1 と LOD2 で範囲が違うかは、
+  **B（PLATEAU VIEW での目視）で必ず確認**すること。
 
-- [x] 200 が返る spec を記録した：`03201-bldg-lod2-latest`
+- [x] 200 が返る spec を記録した：`03201-bldg-lod1-latest` / `03201-bldg-lod2-latest`
 - [x] `latest` 指定が使える（＝年度更新に自動追従できる）ことを確認した → **採用方針とする**
-- [ ] `03201-bldg-lod1-latest` の疎通を確認する
+- [x] LOD1 / LOD2 の両方で疎通を確認した
 
 ### A-4. カタログ API のレスポンススキーマ（実測で追加確認）
 
