@@ -8,7 +8,8 @@ import { surfaceDistance, bearing, compass16, elevationAngle, fmtDistance } from
 import { rankCandidates } from './scoring.js';
 import { FUTURE_WORK } from './congestion.js';
 import { loadRegulation, showRegulation, legendItems, bridgeClosure } from './regulation.js';
-import { renderFirework } from './fireworks.js';
+import { renderFirework, configure as configureFireworks, startShow, stopShow,
+  launchOnce, clearShells, isPlaying } from './fireworks.js';
 
 /* ---------- エラー表示 ---------- */
 const errBox = document.getElementById('errors');
@@ -297,16 +298,58 @@ async function placeFirework(quiet = false) {
         '左パネルの「地形」の選択を変えてください。');
     }
   }
-  renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value), night);
+  drawFirework();
   syncDetail();
 }
+
+/** 打上地点のマーカーと高度の目安を描き直す（再生中は目安の球を出さない） */
+function drawFirework() {
+  renderFirework(viewer, LAUNCH_SITE, launchGround ?? 0, Number(altInput.value), night,
+    { showBurst: !isPlaying() });
+  configureFireworks({
+    viewer, site: LAUNCH_SITE, ground: launchGround ?? 0,
+    altitude: Number(altInput.value), night,
+    intervalSec: Number(rateInput.value),
+  });
+}
 const altInput = document.getElementById('altitude');
+const rateInput = document.getElementById('rate');
 altInput.min = FIREWORK.minAlt; altInput.max = FIREWORK.maxAlt; altInput.value = FIREWORK.defaultAlt;
 document.getElementById('altLabel').textContent = FIREWORK.defaultAlt;
 altInput.oninput = () => {
   document.getElementById('altLabel').textContent = altInput.value;
-  renderFirework(viewer, LAUNCH_SITE, launchGround ?? 0, Number(altInput.value), night);
+  drawFirework();
   syncDetail();
+};
+
+/* ---------- 花火のアニメーション（演出） ---------- */
+const btnPlay = document.getElementById('btnPlay');
+rateInput.oninput = () => {
+  document.getElementById('rateLabel').textContent = Number(rateInput.value).toFixed(1);
+  configureFireworks({ intervalSec: Number(rateInput.value) });
+};
+function syncPlayButton() { btnPlay.setAttribute('aria-pressed', String(isPlaying())); }
+btnPlay.onclick = () => {
+  configureFireworks({
+    viewer, site: LAUNCH_SITE, ground: launchGround ?? 0,
+    altitude: Number(altInput.value), night, intervalSec: Number(rateInput.value),
+  });
+  startShow();
+  syncPlayButton();
+  drawFirework(); // 目安の球を消す
+};
+document.getElementById('btnStopAnim').onclick = () => {
+  stopShow();
+  clearShells();
+  syncPlayButton();
+  drawFirework(); // 目安の球を戻す
+};
+document.getElementById('btnOnce').onclick = () => {
+  configureFireworks({
+    viewer, site: LAUNCH_SITE, ground: launchGround ?? 0,
+    altitude: Number(altInput.value), night, intervalSec: Number(rateInput.value),
+  });
+  launchOnce();
 };
 
 /* ---------- 昼夜 ---------- */
@@ -345,9 +388,7 @@ function applyNightStyle(isNight = night) {
     });
   }
   // 花火の見た目も昼夜で切り替える
-  if (launchGround != null) {
-    renderFirework(viewer, LAUNCH_SITE, launchGround, Number(altInput.value), isNight);
-  }
+  if (launchGround != null) drawFirework();
 }
 document.getElementById('btnNight').onclick = () => setNight(true);
 document.getElementById('btnDay').onclick = () => setNight(false);
@@ -501,3 +542,4 @@ function showDetail(r) {
 
 /* 初期状態のボタン表示（すべての宣言が済んだあとで実行する） */
 setCamButtons();
+syncPlayButton();
